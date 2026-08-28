@@ -6,12 +6,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ORDER: Record<string, string> = {
-  order: "ord nulls last, priority nulls last, id",
-  due: "due_date nulls last, ord nulls last",
-  priority: "priority nulls last, ord nulls last",
-  case: "lower(case_name) nulls last, ord nulls last",
-  modified: "coalesce(at_modified, updated_at) desc",
+// Sortable columns. Direction comes in separately so headers can toggle.
+const COL: Record<string, string> = {
+  order: "ord",
+  priority: "priority",
+  case: "lower(coalesce(case_name, client_name))",
+  task: "lower(task)",
+  status: "status",
+  who: "who",
+  due: "due_date",
+  modified: "coalesce(at_modified, updated_at)",
+  closed: "closed",
 };
 
 export async function GET(req: Request) {
@@ -37,7 +42,9 @@ export async function GET(req: Request) {
     if (sp.get("q")) add("task ilike ?", "%" + sp.get("q") + "%");
 
     const sql = where.length ? "where " + where.join(" and ") : "";
-    const ord = ORDER[sp.get("sort") || "order"] || ORDER.order;
+    const col = COL[sp.get("sort") || "order"] || COL.order;
+    const dir = sp.get("dir") === "desc" ? "desc" : "asc";
+    const ord = `${col} ${dir} nulls last, ord nulls last, id`;
     const page = Math.max(1, parseInt(sp.get("page") || "1", 10));
     const pageSize = Math.min(500, Math.max(1, parseInt(sp.get("pageSize") || "100", 10)));
 

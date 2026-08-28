@@ -27,15 +27,21 @@ function stamp(v: any): string {
 
 type View = { id: number; name: string; owner?: string; params: any };
 
-const BLANK = { who: "", status: "", priority: "", caseQ: "", q: "", showClosed: false, sort: "order" };
+const BLANK = { who: "", status: "", priority: "", caseQ: "", q: "", showClosed: false, sort: "order", dir: "asc" };
+
+// Columns that sort, and which way they should go the first time you click them.
+const DEFAULT_DIR: Record<string, string> = {
+  order: "asc", priority: "asc", case: "asc", task: "asc",
+  status: "asc", who: "asc", due: "asc", modified: "desc", closed: "asc",
+};
 
 // Always-there buttons for the groups asked for most often.
 const QUICK: { name: string; params: any }[] = [
   { name: "RIE open", params: { ...BLANK, who: "RIE" } },
   { name: "KW open", params: { ...BLANK, who: "KW" } },
   { name: "KV open", params: { ...BLANK, who: "KV" } },
-  { name: "By due date", params: { ...BLANK, sort: "due" } },
-  { name: "Recently changed", params: { ...BLANK, sort: "modified" } },
+  { name: "By due date", params: { ...BLANK, sort: "due", dir: "asc" } },
+  { name: "Recently changed", params: { ...BLANK, sort: "modified", dir: "desc" } },
 ];
 
 export default function Tasks() {
@@ -52,6 +58,7 @@ export default function Tasks() {
   const [q, setQ] = useState("");
   const [showClosed, setShowClosed] = useState(false);
   const [sort, setSort] = useState("order");
+  const [dir, setDir] = useState("asc");
   const [page, setPage] = useState(1);
   const pageSize = 100;
 
@@ -63,7 +70,8 @@ export default function Tasks() {
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
 
-  const current = useMemo(() => ({ who, status, priority, caseQ, q, showClosed, sort }), [who, status, priority, caseQ, q, showClosed, sort]);
+  const current = useMemo(() => ({ who, status, priority, caseQ, q, showClosed, sort, dir }),
+    [who, status, priority, caseQ, q, showClosed, sort, dir]);
   const isBlank = useMemo(() => JSON.stringify(current) === JSON.stringify(BLANK), [current]);
 
   const qs = useMemo(() => {
@@ -75,10 +83,11 @@ export default function Tasks() {
     if (q) p.set("q", q);
     if (showClosed) p.set("closed", "1");
     p.set("sort", sort);
+    p.set("dir", dir);
     p.set("page", String(page));
     p.set("pageSize", String(pageSize));
     return p.toString();
-  }, [who, status, priority, caseQ, q, showClosed, sort, page]);
+  }, [who, status, priority, caseQ, q, showClosed, sort, dir, page]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +112,13 @@ export default function Tasks() {
   }, []);
   useEffect(() => { loadViews(); }, [loadViews]);
 
+  // Click a header to sort by it. Click it again to flip the direction.
+  function sortBy(col: string) {
+    if (sort === col) setDir(dir === "asc" ? "desc" : "asc");
+    else { setSort(col); setDir(DEFAULT_DIR[col] || "asc"); }
+    setPage(1);
+  }
+
   function applyParams(params: any) {
     const p = { ...BLANK, ...(params || {}) };
     setWho(p.who || "");
@@ -112,12 +128,10 @@ export default function Tasks() {
     setQ(p.q || "");
     setShowClosed(!!p.showClosed);
     setSort(p.sort || "order");
+    setDir(p.dir || "asc");
     setPage(1);
   }
-  function clearAll() {
-    setWho(""); setStatus(""); setPriority(""); setCaseQ(""); setQ("");
-    setShowClosed(false); setSort("order"); setPage(1);
-  }
+  function clearAll() { applyParams(BLANK); }
   function matchesParams(params: any) {
     return JSON.stringify({ ...BLANK, ...(params || {}) }) === JSON.stringify(current);
   }
@@ -170,6 +184,13 @@ export default function Tasks() {
   const today = todayStr();
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
+  const Th = ({ id, label, width }: { id: string; label: string; width?: number }) => (
+    <th style={width ? { width } : undefined} className="sortable" title={"Sort by " + label}
+        onClick={() => sortBy(id)}>
+      {label}<span className="caret">{sort === id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+    </th>
+  );
+
   return (
     <div className="wrap">
       {msg ? <div className={"notice " + msg.kind}>{msg.text}</div> : null}
@@ -218,13 +239,6 @@ export default function Tasks() {
           </div>
           <div className="spacer" />
           <button className={"chip " + (showClosed ? "on" : "")} onClick={() => { setShowClosed(!showClosed); setPage(1); }}>{showClosed ? "Showing closed" : "Open only"}</button>
-          <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} style={{ width: 150 }}>
-            <option value="order">Sort: Order</option>
-            <option value="due">Sort: Due date</option>
-            <option value="priority">Sort: Priority</option>
-            <option value="case">Sort: Case</option>
-            <option value="modified">Sort: Recently changed</option>
-          </select>
         </div>
         <div className="grid g4" style={{ marginTop: 9 }}>
           <div><label className="f">Status</label>
@@ -250,6 +264,7 @@ export default function Tasks() {
           <div className="stats"><div className="stat"><b>{total.toLocaleString()}</b><span>{showClosed ? "Tasks" : "Open tasks"}</span></div></div>
           <div className="spacer" />
           <div className="row noprint">
+            <span className="muted small">Click a column heading to sort.</span>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
@@ -258,20 +273,21 @@ export default function Tasks() {
         <div className="tablewrap">
           <table className="data">
             <thead><tr>
-              <th style={{ width: 128 }}>Priority</th>
-              <th style={{ width: 180 }}>Case</th>
-              <th>Task</th>
-              <th style={{ width: 170 }}>Status</th>
-              <th style={{ width: 62 }}>Who</th>
-              <th style={{ width: 88 }}>Due</th>
-              <th style={{ width: 118 }}>Modified</th>
-              <th className="noprint" style={{ width: 120 }}></th>
+              <Th id="closed" label="Done" width={54} />
+              <Th id="priority" label="Priority" width={128} />
+              <Th id="case" label="Case" width={180} />
+              <Th id="task" label="Task" />
+              <Th id="status" label="Status" width={170} />
+              <Th id="who" label="Who" width={62} />
+              <Th id="due" label="Due" width={88} />
+              <Th id="modified" label="Modified" width={118} />
+              <th className="noprint" style={{ width: 62 }}></th>
             </tr></thead>
             <tbody>
-              {loading ? (<tr><td colSpan={8} className="muted">Loading...</td></tr>)
-                : rows.length === 0 ? (<tr><td colSpan={8} className="muted">No tasks match these filters.</td></tr>)
+              {loading ? (<tr><td colSpan={9} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={9} className="muted">No tasks match these filters.</td></tr>)
                 : rows.map((t) => editing === t.id ? (
-                <tr key={t.id}><td colSpan={8}>
+                <tr key={t.id}><td colSpan={9}>
                   <div className="grid g4">
                     <div><label className="f">Status</label>
                       <select value={draft.status || ""} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
@@ -303,6 +319,9 @@ export default function Tasks() {
                 </td></tr>
               ) : (
                 <tr key={t.id} className={prioClass(t.priority) + (!t.closed && t.due_date && d10(t.due_date) < today ? " overdue" : "")}>
+                  <td className="tick">
+                    <input type="checkbox" checked={!!t.closed} title={t.closed ? "Reopen this task" : "Mark this task done"} onChange={() => toggleClosed(t)} />
+                  </td>
                   <td className="small">{t.priority || <span className="muted">-</span>}</td>
                   <td>{t.case_name || t.client_name || <span className="muted">-</span>}</td>
                   <td>{t.task}{t.link ? <> <a href={t.link} target="_blank" rel="noreferrer" className="small noprint">file</a></> : null}</td>
@@ -312,7 +331,6 @@ export default function Tasks() {
                   <td className="date muted nowrap" title={stamp(t.at_modified || t.updated_at)}>{when(t.at_modified || t.updated_at)}</td>
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>
-                    <button className="btn ghost sm" title={t.closed ? "Reopen" : "Mark closed"} onClick={() => toggleClosed(t)}>{t.closed ? "Reopen" : "Done"}</button>
                   </td>
                 </tr>
               ))}
