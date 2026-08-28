@@ -171,3 +171,7 @@ pre{background:#0f172a;color:#e2e8f0;padding:11px;border-radius:var(--rs);overfl
 .viewchip .x:hover{color:var(--danger);border-color:var(--danger)}
 .sep{display:inline-block;width:1px;align-self:stretch;background:var(--line);margin:0 3px}
 .nowrap{white-space:nowrap}
+table.data th.over{box-shadow:inset 3px 0 0 var(--accent)}
+table.data th.dragging{opacity:.45}
+table.data th .grip{opacity:.3;margin-right:5px;cursor:grab;font-size:10px}
+table.data th:hover .grip{opacity:.6}

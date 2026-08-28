@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_USERS, prioClass } from "../../lib/constants";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
@@ -8,7 +8,7 @@ const todayStr = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
-// Modified column: an actual date and time, e.g. 8/28/26 3:42 PM.
+// Modified column: a real date AND time, e.g. 8/28/26 3:42 PM.
 function when(v: any): string {
   if (!v) return "";
   const t = new Date(v);
@@ -29,13 +29,11 @@ type View = { id: number; name: string; owner?: string; params: any };
 
 const BLANK = { who: "", status: "", priority: "", caseQ: "", q: "", showClosed: false, sort: "order", dir: "asc" };
 
-// Columns that sort, and which way they should go the first time you click them.
 const DEFAULT_DIR: Record<string, string> = {
   order: "asc", priority: "asc", case: "asc", task: "asc",
   status: "asc", who: "asc", due: "asc", modified: "desc", closed: "asc",
 };
 
-// Always-there buttons for the groups asked for most often.
 const QUICK: { name: string; params: any }[] = [
   { name: "RIE open", params: { ...BLANK, who: "RIE" } },
   { name: "KW open", params: { ...BLANK, who: "KW" } },
@@ -43,6 +41,20 @@ const QUICK: { name: string; params: any }[] = [
   { name: "By due date", params: { ...BLANK, sort: "due", dir: "asc" } },
   { name: "Recently changed", params: { ...BLANK, sort: "modified", dir: "desc" } },
 ];
+
+// Drag a heading sideways to reorder. Layout is remembered on this computer.
+const COLUMNS: { id: string; label: string; width?: number }[] = [
+  { id: "closed", label: "Done", width: 54 },
+  { id: "priority", label: "Priority", width: 128 },
+  { id: "case", label: "Case", width: 180 },
+  { id: "task", label: "Task" },
+  { id: "status", label: "Status", width: 170 },
+  { id: "who", label: "Who", width: 62 },
+  { id: "due", label: "Due", width: 88 },
+  { id: "modified", label: "Modified", width: 132 },
+];
+const DEFAULT_ORDER = COLUMNS.map((c) => c.id);
+const LAYOUT_KEY = "efl.tasks.columns";
 
 export default function Tasks() {
   const [rows, setRows] = useState<any[]>([]);
@@ -66,9 +78,42 @@ export default function Tasks() {
   const [naming, setNaming] = useState(false);
   const [viewName, setViewName] = useState("");
 
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const dragged = useRef(false);
+
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
+
+  // Restore the saved column layout, dropping anything unrecognised and
+  // appending any column added since the layout was saved.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LAYOUT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!Array.isArray(saved)) return;
+      const kept = saved.filter((id: any) => DEFAULT_ORDER.indexOf(id) >= 0);
+      const missing = DEFAULT_ORDER.filter((id) => kept.indexOf(id) < 0);
+      if (kept.length) setOrder([...kept, ...missing]);
+    } catch {}
+  }, []);
+  function persist(next: string[]) {
+    setOrder(next);
+    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(next)); } catch {}
+  }
+  function resetColumns() {
+    persist(DEFAULT_ORDER);
+    setMsg({ kind: "ok", text: "Columns put back in their original order." });
+  }
+  function drop(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const next = order.filter((id) => id !== dragId);
+    next.splice(next.indexOf(targetId), 0, dragId);
+    persist(next);
+  }
 
   const current = useMemo(() => ({ who, status, priority, caseQ, q, showClosed, sort, dir }),
     [who, status, priority, caseQ, q, showClosed, sort, dir]);
@@ -112,8 +157,8 @@ export default function Tasks() {
   }, []);
   useEffect(() => { loadViews(); }, [loadViews]);
 
-  // Click a header to sort by it. Click it again to flip the direction.
   function sortBy(col: string) {
+    if (dragged.current) return;
     if (sort === col) setDir(dir === "asc" ? "desc" : "asc");
     else { setSort(col); setDir(DEFAULT_DIR[col] || "asc"); }
     setPage(1);
@@ -183,13 +228,32 @@ export default function Tasks() {
 
   const today = todayStr();
   const pages = Math.max(1, Math.ceil(total / pageSize));
+  const cols = order.map((id) => COLUMNS.find((c) => c.id === id)!).filter(Boolean);
 
-  const Th = ({ id, label, width }: { id: string; label: string; width?: number }) => (
-    <th style={width ? { width } : undefined} className="sortable" title={"Sort by " + label}
-        onClick={() => sortBy(id)}>
-      {label}<span className="caret">{sort === id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
-    </th>
-  );
+  function cell(id: string, t: any) {
+    switch (id) {
+      case "closed":
+        return <td key={id} className="tick">
+          <input type="checkbox" checked={!!t.closed} title={t.closed ? "Reopen this task" : "Mark this task done"} onChange={() => toggleClosed(t)} />
+        </td>;
+      case "priority":
+        return <td key={id} className="small">{t.priority || <span className="muted">-</span>}</td>;
+      case "case":
+        return <td key={id}>{t.case_name || t.client_name || <span className="muted">-</span>}</td>;
+      case "task":
+        return <td key={id}>{t.task}{t.link ? <> <a href={t.link} target="_blank" rel="noreferrer" className="small noprint">file</a></> : null}</td>;
+      case "status":
+        return <td key={id} className="small">{t.status || <span className="muted">-</span>}</td>;
+      case "who":
+        return <td key={id} className="who">{t.who}</td>;
+      case "due":
+        return <td key={id} className="date">{d10(t.due_date)}</td>;
+      case "modified":
+        return <td key={id} className="date nowrap" title={stamp(t.at_modified || t.updated_at)}>{when(t.at_modified || t.updated_at)}</td>;
+      default:
+        return <td key={id} />;
+    }
+  }
 
   return (
     <div className="wrap">
@@ -264,7 +328,8 @@ export default function Tasks() {
           <div className="stats"><div className="stat"><b>{total.toLocaleString()}</b><span>{showClosed ? "Tasks" : "Open tasks"}</span></div></div>
           <div className="spacer" />
           <div className="row noprint">
-            <span className="muted small">Click a column heading to sort.</span>
+            <span className="muted small">Click a heading to sort. Drag a heading to move the column.</span>
+            <button className="btn sm" onClick={resetColumns}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
@@ -273,21 +338,28 @@ export default function Tasks() {
         <div className="tablewrap">
           <table className="data">
             <thead><tr>
-              <Th id="closed" label="Done" width={54} />
-              <Th id="priority" label="Priority" width={128} />
-              <Th id="case" label="Case" width={180} />
-              <Th id="task" label="Task" />
-              <Th id="status" label="Status" width={170} />
-              <Th id="who" label="Who" width={62} />
-              <Th id="due" label="Due" width={88} />
-              <Th id="modified" label="Modified" width={118} />
+              {cols.map((c) => (
+                <th key={c.id} style={c.width ? { width: c.width } : undefined}
+                    className={"sortable" + (overId === c.id ? " over" : "") + (dragId === c.id ? " dragging" : "")}
+                    draggable
+                    onDragStart={() => { dragged.current = true; setDragId(c.id); }}
+                    onDragEnd={() => { setDragId(null); setOverId(null); setTimeout(() => { dragged.current = false; }, 60); }}
+                    onDragOver={(e) => { e.preventDefault(); setOverId(c.id); }}
+                    onDragLeave={() => setOverId((v) => (v === c.id ? null : v))}
+                    onDrop={(e) => { e.preventDefault(); drop(c.id); setOverId(null); }}
+                    title={"Click to sort by " + c.label + ". Drag to move this column."}
+                    onClick={() => sortBy(c.id)}>
+                  <span className="grip">⠿</span>{c.label}
+                  <span className="caret">{sort === c.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+                </th>
+              ))}
               <th className="noprint" style={{ width: 62 }}></th>
             </tr></thead>
             <tbody>
-              {loading ? (<tr><td colSpan={9} className="muted">Loading...</td></tr>)
-                : rows.length === 0 ? (<tr><td colSpan={9} className="muted">No tasks match these filters.</td></tr>)
+              {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">No tasks match these filters.</td></tr>)
                 : rows.map((t) => editing === t.id ? (
-                <tr key={t.id}><td colSpan={9}>
+                <tr key={t.id}><td colSpan={cols.length + 1}>
                   <div className="grid g4">
                     <div><label className="f">Status</label>
                       <select value={draft.status || ""} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
@@ -319,16 +391,7 @@ export default function Tasks() {
                 </td></tr>
               ) : (
                 <tr key={t.id} className={prioClass(t.priority) + (!t.closed && t.due_date && d10(t.due_date) < today ? " overdue" : "")}>
-                  <td className="tick">
-                    <input type="checkbox" checked={!!t.closed} title={t.closed ? "Reopen this task" : "Mark this task done"} onChange={() => toggleClosed(t)} />
-                  </td>
-                  <td className="small">{t.priority || <span className="muted">-</span>}</td>
-                  <td>{t.case_name || t.client_name || <span className="muted">-</span>}</td>
-                  <td>{t.task}{t.link ? <> <a href={t.link} target="_blank" rel="noreferrer" className="small noprint">file</a></> : null}</td>
-                  <td className="small">{t.status || <span className="muted">-</span>}</td>
-                  <td className="who">{t.who}</td>
-                  <td className="date">{d10(t.due_date)}</td>
-                  <td className="date muted nowrap" title={stamp(t.at_modified || t.updated_at)}>{when(t.at_modified || t.updated_at)}</td>
+                  {cols.map((c) => cell(c.id, t))}
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>
                   </td>
