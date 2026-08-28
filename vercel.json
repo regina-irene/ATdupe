@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/cases/sync", "schedule": "0 6 * * *" },
+    { "path": "/api/sync/time", "schedule": "*/15 * * * *" },
+    { "path": "/api/sync/tasks", "schedule": "7,22,37,52 * * * *" }
+  ]
+}
