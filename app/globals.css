@@ -11,6 +11,8 @@
 :root[data-page=import]{--page:#b45309}
 :root[data-page=tasks]{--page:#7c3aed}
 :root[data-page=payments]{--page:#047857}
+:root[data-page=cases]{--page:#c2410c}
+:root[data-page=clients]{--page:#a21caf}
 :root[data-page=setup]{--page:#0f766e}
 :root[data-mode=dark]{--bg:#0b1017;--panel:#141b25;--panel-2:#18202b;--ink:#e8eef7;--muted:#94a3b8;--line:#252f3d;--danger:#fb7185;--warn:#fbbf24;--good:#34d399;--sh:0 1px 2px rgba(0,0,0,.4);--sh-lg:0 10px 30px -10px rgba(0,0,0,.7)}
 :root[data-mode=dark][data-page=board]{--page:#60a5fa}
@@ -18,6 +20,8 @@
 :root[data-mode=dark][data-page=import]{--page:#fbbf24}
 :root[data-mode=dark][data-page=tasks]{--page:#a78bfa}
 :root[data-mode=dark][data-page=payments]{--page:#34d399}
+:root[data-mode=dark][data-page=cases]{--page:#fb923c}
+:root[data-mode=dark][data-page=clients]{--page:#e879f9}
 :root[data-mode=dark][data-page=setup]{--page:#2dd4bf}
 :root[data-density=compact]{--pad:9px;--gap:7px;--ctl:4px 8px}
 :root[data-density=roomy]{--pad:16px;--gap:13px;--ctl:8px 11px}
@@ -276,3 +280,7 @@ table.data th.money{text-align:right}
 :root[data-mode=dark] .sel-grayBright{background:#333a45;color:#ced2d8}
 :root[data-mode=dark] .sel-grayDark1{background:#333a45;color:#ced2d8}
 .tag+.tag{margin-left:4px}
+.card[data-tone=case]{--tone:#c2410c}
+:root[data-mode=dark] .card[data-tone=case]{--tone:#fb923c}
+.topbar nav{overflow-x:auto;scrollbar-width:none}
+.topbar nav::-webkit-scrollbar{display:none}

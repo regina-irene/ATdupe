@@ -1,0 +1,328 @@
+"use client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import MultiSelect from "./MultiSelect";
+import Chip from "./Chip";
+
+type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
+type Row = { id: number; airtable_id: string | null; data: any; at_modified: string | null; updated_at: string; source: string };
+
+const TEXTY = ["singleLineText", "multilineText", "richText", "email", "url", "phoneNumber", "barcode"];
+const NUMY = ["number", "currency", "percent", "duration", "rating", "autoNumber"];
+
+function when(v: any): string {
+  if (!v) return "";
+  const t = new Date(v);
+  if (isNaN(t.getTime())) return "";
+  const y = String(t.getFullYear()).slice(2);
+  const m = String(t.getMinutes()).padStart(2, "0");
+  const ap = t.getHours() >= 12 ? "PM" : "AM";
+  return `${t.getMonth() + 1}/${t.getDate()}/${y} ${t.getHours() % 12 || 12}:${m} ${ap}`;
+}
+const strip = (v: any) => String(v ?? "").replace(/<[^>]*>/g, "");
+
+export default function MirrorBoard({ boardKey }: { boardKey: string }) {
+  const [fields, setFields] = useState<Field[]>([]);
+  const [label, setLabel] = useState("");
+  const [singular, setSingular] = useState("record");
+  const [primary, setPrimary] = useState("");
+  const [rows, setRows] = useState<Row[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const [q, setQ] = useState("");
+  const [picks, setPicks] = useState<Record<string, string[]>>({});
+  const [sort, setSort] = useState("");
+  const [dir, setDir] = useState("asc");
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
+
+  const [shown, setShown] = useState<string[]>([]);
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const [term, setTerm] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const dragged = useRef(false);
+  const pickerBox = useRef<HTMLDivElement>(null);
+
+  const [editing, setEditing] = useState<number | null>(null);
+  const [draft, setDraft] = useState<any>({});
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState<any>({});
+
+  const LAYOUT = "efl.mirror." + boardKey + ".columns";
+  const byId = useMemo(() => new Map(fields.map((f) => [f.id, f] as const)), [fields]);
+  const colorsFor = (f: Field) => Object.fromEntries((f.choices || []).map((c) => [c.name, c.color]));
+
+  useEffect(() => {
+    fetch("/api/mirror/" + boardKey + "/schema").then((r) => r.json()).then((j) => {
+      if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+      setFields(j.fields || []); setLabel(j.label || ""); setSingular(j.singular || "record"); setPrimary(j.primary || "");
+    }).catch((e) => setMsg({ kind: "err", text: e.message }));
+  }, [boardKey]);
+
+  // First visit shows a readable handful; after that, whatever you chose.
+  useEffect(() => {
+    if (!fields.length || layoutReady) return;
+    let next: string[] | null = null;
+    try {
+      const raw = localStorage.getItem(LAYOUT);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved)) next = saved.filter((id: any) => fields.some((f) => f.id === id));
+      }
+    } catch {}
+    if (!next || !next.length) next = fields.slice(0, 8).map((f) => f.id);
+    setShown(next);
+    setLayoutReady(true);
+  }, [fields, layoutReady, LAYOUT]);
+
+  function persist(next: string[]) {
+    setShown(next);
+    try { localStorage.setItem(LAYOUT, JSON.stringify(next)); } catch {}
+  }
+  function toggleCol(id: string) {
+    persist(shown.indexOf(id) >= 0 ? shown.filter((c) => c !== id) : [...shown, id]);
+  }
+  function drop(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const next = shown.filter((id) => id !== dragId);
+    next.splice(next.indexOf(targetId), 0, dragId);
+    persist(next);
+  }
+  useEffect(() => {
+    if (!picker) return;
+    const away = (e: MouseEvent) => { if (pickerBox.current && !pickerBox.current.contains(e.target as Node)) setPicker(false); };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [picker]);
+
+  const qs = useMemo(() => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    for (const fid of Object.keys(picks)) for (const v of picks[fid]) p.append("f", fid + ":" + v);
+    if (sort) p.set("sort", sort);
+    p.set("dir", dir);
+    p.set("page", String(page));
+    p.set("pageSize", String(pageSize));
+    return p.toString();
+  }, [q, picks, sort, dir, page]);
+
+  const load = useCallback(async () => {
+    if (!fields.length) return;
+    setLoading(true);
+    try {
+      const r = await fetch("/api/mirror/" + boardKey + "?" + qs);
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      setRows(j.rows || []); setTotal(j.total || 0); setMsg(null);
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setLoading(false);
+  }, [qs, boardKey, fields.length]);
+  useEffect(() => { load(); }, [load]);
+
+  function sortBy(fid: string) {
+    if (dragged.current) return;
+    if (sort === fid) setDir(dir === "asc" ? "desc" : "asc");
+    else { setSort(fid); setDir("asc"); }
+    setPage(1);
+  }
+
+  async function save(id: number) {
+    const r = await fetch("/api/mirror/" + boardKey + "/" + id, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ data: draft }),
+    });
+    const j = await r.json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setEditing(null); load();
+  }
+  async function create() {
+    const r = await fetch("/api/mirror/" + boardKey, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data: form }),
+    });
+    const j = await r.json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setForm({}); setAdding(false);
+    setMsg({ kind: "ok", text: "Added. It reaches Airtable at the next sync." });
+    load();
+  }
+  async function syncNow() {
+    setSyncing(true);
+    try {
+      const r = await fetch("/api/sync/mirror/" + boardKey, { method: "POST" });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      setMsg({ kind: "ok", text: `Pulled ${j.pulled} from Airtable, sent ${j.pushed_new} new and ${j.pushed_upd} updates.` });
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setSyncing(false);
+  }
+
+  function show(f: Field, v: any) {
+    if (v === null || v === undefined || v === "") return <span className="muted">-</span>;
+    if (f.type === "checkbox") return v ? "Yes" : <span className="muted">No</span>;
+    if (f.type === "singleSelect") return <Chip v={v} colors={colorsFor(f)} />;
+    if (f.type === "multipleSelects") return <Chip v={Array.isArray(v) ? v.join(", ") : v} colors={colorsFor(f)} />;
+    if (f.type === "date") return String(v).slice(0, 10);
+    if (f.type === "dateTime" || f.type === "lastModifiedTime" || f.type === "createdTime") return when(v);
+    if (f.type === "url") return <a href={String(v)} target="_blank" rel="noreferrer">link</a>;
+    if (f.type === "multipleRecordLinks") return <span className="muted small">{(v as any[]).length} linked</span>;
+    if (f.type === "multipleAttachments") return <span className="muted small">{(v as any[]).length} file(s)</span>;
+    if (v && typeof v === "object") return <span className="small">{strip(v.name || JSON.stringify(v))}</span>;
+    if (Array.isArray(v)) return <span className="small">{v.map((x) => (x && typeof x === "object" ? x.name : x)).join(", ")}</span>;
+    if (NUMY.indexOf(f.type) >= 0) return <span className="money">{String(v)}</span>;
+    const t = strip(v);
+    return <span title={t.length > 90 ? t : undefined}>{t.length > 90 ? t.slice(0, 90) + "..." : t}</span>;
+  }
+
+  function input(f: Field, val: any, set: (v: any) => void) {
+    if (f.type === "checkbox") return <input type="checkbox" checked={!!val} onChange={(e) => set(e.target.checked)} />;
+    if (f.type === "singleSelect") return (
+      <select value={val ?? ""} onChange={(e) => set(e.target.value)}>
+        <option value="">-</option>
+        {(f.choices || []).map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+      </select>);
+    if (f.type === "multipleSelects") return (
+      <MultiSelect label="" allLabel="None" options={(f.choices || []).map((c) => c.name)}
+        value={Array.isArray(val) ? val : val ? [val] : []} onChange={(v) => set(v)} />);
+    if (f.type === "date") return <input type="date" value={val ? String(val).slice(0, 10) : ""} onChange={(e) => set(e.target.value)} />;
+    if (f.type === "dateTime") return <input type="datetime-local" value={val ? String(val).slice(0, 16) : ""} onChange={(e) => set(e.target.value)} />;
+    if (NUMY.indexOf(f.type) >= 0) return <input type="number" step="any" value={val ?? ""} onChange={(e) => set(e.target.value)} />;
+    if (f.type === "multilineText" || f.type === "richText") return <textarea value={strip(val)} onChange={(e) => set(e.target.value)} />;
+    return <input type="text" value={val ?? ""} onChange={(e) => set(e.target.value)} />;
+  }
+
+  const cols = shown.map((id) => byId.get(id)!).filter(Boolean);
+  const editable = fields.filter((f) => f.writable);
+  const filterable = fields.filter((f) => f.type === "singleSelect" || f.type === "multipleSelects");
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const pickerList = term ? fields.filter((f) => f.name.toLowerCase().indexOf(term.toLowerCase()) >= 0) : fields;
+
+  return (
+    <div className="wrap">
+      {msg ? <div className={"notice " + msg.kind}>{msg.text}</div> : null}
+
+      <div className="card noprint" data-tone="case">
+        <div className="row">
+          <h2 style={{ margin: 0 }}>Filters</h2>
+          <div className="spacer" />
+          <button className="btn sm" onClick={() => setAdding(!adding)}>{adding ? "Close" : "New " + singular}</button>
+        </div>
+        {adding ? (
+          <>
+            <div className="grid g4" style={{ marginTop: 9 }}>
+              {editable.slice(0, 8).map((f) => (
+                <div key={f.id}><label className="f">{f.name}</label>{input(f, form[f.id], (v) => setForm({ ...form, [f.id]: v }))}</div>
+              ))}
+            </div>
+            <div className="row" style={{ marginTop: 9 }}>
+              <button className="btn primary sm" onClick={create}>Save</button>
+              <div className="spacer" />
+              <span className="muted small">Fill the rest in after it appears, or in Airtable.</span>
+            </div>
+          </>
+        ) : null}
+        <div className="row" style={{ marginTop: 9 }}>
+          <div style={{ flex: 1 }}><label className="f">Search everything</label>
+            <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, note, anything" /></div>
+        </div>
+        <div className="grid g4" style={{ marginTop: 7 }}>
+          {filterable.slice(0, 8).map((f) => (
+            <MultiSelect key={f.id} label={f.name} allLabel={"All"} options={(f.choices || []).map((c) => c.name)}
+              value={picks[f.id] || []} onChange={(v) => { setPicks({ ...picks, [f.id]: v }); setPage(1); }} />
+          ))}
+        </div>
+      </div>
+
+      <div className="card" data-tone="case">
+        <div className="row" style={{ marginBottom: 9 }}>
+          <div className="stats"><div className="stat"><b>{total.toLocaleString()}</b><span>{label}</span></div></div>
+          <div className="spacer" />
+          <div className="row noprint">
+            <div className="ms" ref={pickerBox}>
+              <button className="btn sm" onClick={() => setPicker(!picker)}>Columns ({cols.length}/{fields.length})</button>
+              {picker ? (
+                <div className="mspanel" style={{ right: 0, left: "auto" }}>
+                  <input type="search" autoFocus placeholder="Find a field..." value={term} onChange={(e) => setTerm(e.target.value)} />
+                  <div className="msrow">
+                    <button className="btn ghost sm" onClick={() => persist(pickerList.map((f) => f.id))}>Show all</button>
+                    <button className="btn ghost sm" onClick={() => persist(fields.slice(0, 8).map((f) => f.id))}>Reset</button>
+                    <div className="spacer" />
+                    <button className="btn ghost sm" onClick={() => setPicker(false)}>Done</button>
+                  </div>
+                  <div className="mslist">
+                    {pickerList.map((f) => (
+                      <label key={f.id} className="msitem">
+                        <input type="checkbox" checked={shown.indexOf(f.id) >= 0} onChange={() => toggleCol(f.id)} />
+                        <span>{f.name}</span>
+                        {!f.writable ? <span className="muted small" style={{ marginLeft: "auto" }}>read only</span> : null}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
+            <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
+          </div>
+        </div>
+
+        <div className="tablewrap">
+          <table className="data">
+            <thead><tr>
+              {cols.map((f) => (
+                <th key={f.id} className={"sortable" + (overId === f.id ? " over" : "") + (dragId === f.id ? " dragging" : "")}
+                    draggable
+                    onDragStart={() => { dragged.current = true; setDragId(f.id); }}
+                    onDragEnd={() => { setDragId(null); setOverId(null); setTimeout(() => { dragged.current = false; }, 60); }}
+                    onDragOver={(e) => { e.preventDefault(); setOverId(f.id); }}
+                    onDragLeave={() => setOverId((v) => (v === f.id ? null : v))}
+                    onDrop={(e) => { e.preventDefault(); drop(f.id); setOverId(null); }}
+                    onClick={() => sortBy(f.id)}>
+                  <span className="grip">⠿</span>{f.name}
+                  <span className="caret">{sort === f.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+                </th>
+              ))}
+              <th className="noprint" style={{ width: 62 }}></th>
+            </tr></thead>
+            <tbody>
+              {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">Nothing matches. If this board is empty, press Sync Airtable.</td></tr>)
+                : rows.map((r) => editing === r.id ? (
+                <tr key={r.id}><td colSpan={cols.length + 1}>
+                  <div className="grid g4">
+                    {editable.map((f) => (
+                      <div key={f.id}><label className="f">{f.name}</label>
+                        {input(f, draft[f.id], (v) => setDraft({ ...draft, [f.id]: v }))}</div>
+                    ))}
+                  </div>
+                  <div className="row" style={{ marginTop: 9 }}>
+                    <button className="btn primary sm" onClick={() => save(r.id)}>Save</button>
+                    <button className="btn ghost sm" onClick={() => setEditing(null)}>Cancel</button>
+                    <div className="spacer" />
+                    <span className="muted small">Changes reach Airtable at the next sync. Formulas and rollups are not shown here because Airtable works them out.</span>
+                  </div>
+                </td></tr>
+              ) : (
+                <tr key={r.id}>
+                  {cols.map((f) => <td key={f.id} className="small">{show(f, r.data?.[f.id])}</td>)}
+                  <td className="noprint">
+                    <button className="btn ghost sm" onClick={() => { setEditing(r.id); setDraft({ ...(r.data || {}) }); }}>Edit</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="row noprint" style={{ marginTop: 9 }}>
+          <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
+          <span className="muted small">Page {page} of {pages}</span>
+          <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
+        </div>
+      </div>
+    </div>
+  );
+}

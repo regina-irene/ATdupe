@@ -14,6 +14,8 @@ function pageKey(p: string) {
   if (p.startsWith("/import")) return "import";
   if (p.startsWith("/tasks")) return "tasks";
   if (p.startsWith("/payments")) return "payments";
+  if (p.startsWith("/cases")) return "cases";
+  if (p.startsWith("/clients")) return "clients";
   if (p.startsWith("/setup")) return "setup";
   return "board";
 }
@@ -21,7 +23,7 @@ function pageKey(p: string) {
 export default function Nav({ name }: { name?: string }) {
   const path = usePathname() || "/";
   const key = pageKey(path);
-  const group = key === "tasks" || key === "payments" || key === "setup" ? key : "time";
+  const group = ["tasks", "payments", "cases", "clients", "setup"].indexOf(key) >= 0 ? key : "time";
 
   useEffect(() => { document.documentElement.setAttribute("data-page", key); }, [key]);
 
@@ -37,6 +39,8 @@ export default function Nav({ name }: { name?: string }) {
           {top("/", "Time", "time")}
           {top("/tasks", "Tasks", "tasks")}
           {top("/payments", "Payments", "payments")}
+          {top("/cases", "Cases", "cases")}
+          {top("/clients", "Clients", "clients")}
           {top("/setup", "Setup", "setup")}
         </nav>
         <div className="who">
