@@ -4,6 +4,7 @@ import MultiSelect from "./MultiSelect";
 import Chip from "./Chip";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
+type Cond = { fid: string; op: string; val: any };
 type Row = { id: number; airtable_id: string | null; data: any; at_modified: string | null; updated_at: string; source: string };
 
 const TEXTY = ["singleLineText", "multilineText", "richText", "email", "url", "phoneNumber", "barcode"];
@@ -32,7 +33,10 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const [syncing, setSyncing] = useState(false);
 
   const [q, setQ] = useState("");
-  const [picks, setPicks] = useState<Record<string, string[]>>({});
+  const [conds, setConds] = useState<Cond[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addTerm, setAddTerm] = useState("");
+  const addBox = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState("");
   const [dir, setDir] = useState("asc");
   const [page, setPage] = useState(1);
@@ -93,6 +97,13 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
     persist(next);
   }
   useEffect(() => {
+    if (!addOpen) return;
+    const away = (e: MouseEvent) => { if (addBox.current && !addBox.current.contains(e.target as Node)) setAddOpen(false); };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [addOpen]);
+
+  useEffect(() => {
     if (!picker) return;
     const away = (e: MouseEvent) => { if (pickerBox.current && !pickerBox.current.contains(e.target as Node)) setPicker(false); };
     document.addEventListener("mousedown", away);
@@ -102,13 +113,17 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const qs = useMemo(() => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
-    for (const fid of Object.keys(picks)) for (const v of picks[fid]) p.append("f", fid + ":" + v);
+    for (const c of conds) {
+      if (c.op === "eq") { for (const v of (c.val as string[]) || []) p.append("f", c.fid + ":eq:" + v); }
+      else if (c.op === "empty" || c.op === "notempty") p.append("f", c.fid + ":" + c.op + ":");
+      else if (c.val !== "" && c.val !== undefined && c.val !== null) p.append("f", c.fid + ":" + c.op + ":" + c.val);
+    }
     if (sort) p.set("sort", sort);
     p.set("dir", dir);
     p.set("page", String(page));
     p.set("pageSize", String(pageSize));
     return p.toString();
-  }, [q, picks, sort, dir, page]);
+  }, [q, conds, sort, dir, page]);
 
   const load = useCallback(async () => {
     if (!fields.length) return;
@@ -194,9 +209,65 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
     return <input type="text" value={val ?? ""} onChange={(e) => set(e.target.value)} />;
   }
 
+  // Which comparisons make sense for a field type.
+  function opsFor(f: Field): [string, string][] {
+    const base: [string, string][] = [["empty", "is empty"], ["notempty", "is not empty"]];
+    if (f.type === "singleSelect" || f.type === "multipleSelects") return [["eq", "is any of"], ...base];
+    if (f.type === "checkbox") return [["bool", "is"]];
+    if (f.type === "date" || f.type === "dateTime" || f.type === "lastModifiedTime" || f.type === "createdTime")
+      return [["gte", "on or after"], ["lte", "on or before"], ...base];
+    if (NUMY.indexOf(f.type) >= 0) return [["gte", "at least"], ["lte", "at most"], ...base];
+    return [["has", "contains"], ...base];
+  }
+  function defaultOp(f: Field) { return opsFor(f)[0][0]; }
+  function defaultVal(op: string) { return op === "eq" ? [] : op === "bool" ? "true" : ""; }
+
+  function addCond(f: Field) {
+    const op = defaultOp(f);
+    setConds([...conds, { fid: f.id, op, val: defaultVal(op) }]);
+    setPage(1);
+  }
+  function setOp(i: number, op: string) {
+    const next = [...conds];
+    next[i] = { ...next[i], op, val: defaultVal(op) };
+    setConds(next); setPage(1);
+  }
+  function setVal(i: number, val: any) {
+    const next = [...conds];
+    next[i] = { ...next[i], val };
+    setConds(next); setPage(1);
+  }
+  // Used by the Open / Closed chips.
+  function setCond(fid: string, op: string, val: any) {
+    const rest = conds.filter((c) => c.fid !== fid);
+    setConds(val === "" ? rest : [...rest, { fid, op, val }]);
+  }
+
+  function condInput(c: Cond, i: number, f: Field) {
+    if (c.op === "empty" || c.op === "notempty") return <div className="muted small" style={{ paddingTop: 20 }}>&nbsp;</div>;
+    if (c.op === "eq") return (
+      <MultiSelect label="Value" allLabel="Any" options={(f.choices || []).map((x) => x.name)}
+        value={Array.isArray(c.val) ? c.val : []} onChange={(v) => setVal(i, v)} />);
+    if (c.op === "bool") return (
+      <><label className="f">Value</label>
+        <select value={String(c.val)} onChange={(e) => setVal(i, e.target.value)}>
+          <option value="true">Ticked</option><option value="false">Not ticked</option>
+        </select></>);
+    if (c.op === "gte" || c.op === "lte") {
+      const numeric = NUMY.indexOf(f.type) >= 0;
+      return (<><label className="f">Value</label>
+        <input type={numeric ? "number" : "date"} step={numeric ? "any" : undefined}
+          value={c.val ?? ""} onChange={(e) => setVal(i, e.target.value)} /></>);
+    }
+    return (<><label className="f">Text</label>
+      <input type="search" value={c.val ?? ""} onChange={(e) => setVal(i, e.target.value)} placeholder="contains" /></>);
+  }
+
+  const closedField = fields.find((f) => f.type === "checkbox" && f.name.trim().toLowerCase() === "closed");
+  const closedPick = closedField ? String(conds.find((c) => c.fid === closedField.id)?.val ?? "") : "";
+
   const cols = shown.map((id) => byId.get(id)!).filter(Boolean);
   const editable = fields.filter((f) => f.writable);
-  const filterable = fields.filter((f) => f.type === "singleSelect" || f.type === "multipleSelects");
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const pickerList = term ? fields.filter((f) => f.name.toLowerCase().indexOf(term.toLowerCase()) >= 0) : fields;
 
@@ -227,12 +298,55 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
         <div className="row" style={{ marginTop: 9 }}>
           <div style={{ flex: 1 }}><label className="f">Search everything</label>
             <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, note, anything" /></div>
+          {closedField ? (
+            <div className="chips" style={{ marginTop: 0, alignSelf: "flex-end", paddingBottom: 2 }}>
+              {[["", "All"], ["false", "Open"], ["true", "Closed"]].map(([v, lab]) => (
+                <button key={lab} className={"chip " + (closedPick === v ? "on" : "")}
+                  onClick={() => { setCond(closedField.id, "bool", v); setPage(1); }}>{lab}</button>
+              ))}
+            </div>
+          ) : null}
         </div>
-        <div className="grid g4" style={{ marginTop: 7 }}>
-          {filterable.slice(0, 8).map((f) => (
-            <MultiSelect key={f.id} label={f.name} allLabel={"All"} options={(f.choices || []).map((c) => c.name)}
-              value={picks[f.id] || []} onChange={(v) => { setPicks({ ...picks, [f.id]: v }); setPage(1); }} />
-          ))}
+
+        {conds.map((c, i) => {
+          const f = byId.get(c.fid);
+          if (!f) return null;
+          return (
+            <div className="row filterrow" key={c.fid + i}>
+              <div style={{ minWidth: 150 }}><label className="f">{f.name}</label>
+                <select value={c.op} onChange={(e) => setOp(i, e.target.value)}>
+                  {opsFor(f).map((o) => <option key={o[0]} value={o[0]}>{o[1]}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>{condInput(c, i, f)}</div>
+              <button className="btn ghost sm" title="Remove this filter"
+                onClick={() => { setConds(conds.filter((_, k) => k !== i)); setPage(1); }}>&times;</button>
+            </div>
+          );
+        })}
+
+        <div className="row" style={{ marginTop: 9 }}>
+          <div className="ms" ref={addBox}>
+            <button className="btn sm" onClick={() => setAddOpen(!addOpen)}>Add a filter</button>
+            {addOpen ? (
+              <div className="mspanel">
+                <input type="search" autoFocus placeholder="Find a field..." value={addTerm} onChange={(e) => setAddTerm(e.target.value)} />
+                <div className="mslist">
+                  {fields.filter((f) => !addTerm || f.name.toLowerCase().indexOf(addTerm.toLowerCase()) >= 0).map((f) => (
+                    <div key={f.id} className="msitem" onClick={() => { addCond(f); setAddOpen(false); setAddTerm(""); }}>
+                      <span>{f.name}</span>
+                      <span className="muted small" style={{ marginLeft: "auto" }}>{f.type.replace(/([A-Z])/g, " $1").toLowerCase()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          {conds.length || q ? (
+            <button className="btn sm" onClick={() => { setConds([]); setQ(""); setPage(1); }}>Clear all</button>
+          ) : null}
+          <div className="spacer" />
+          <span className="muted small">{conds.length ? conds.length + " filter" + (conds.length > 1 ? "s" : "") : "No filters"}</span>
         </div>
       </div>
 

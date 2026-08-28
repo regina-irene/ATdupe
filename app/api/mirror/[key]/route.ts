@@ -24,24 +24,47 @@ export async function GET(req: Request, ctx: any) {
     // Free text across every field.
     if (sp.get("q")) add("data::text ilike ?", "%" + sp.get("q") + "%");
 
-    // Repeatable f=<fieldId>:<value> pairs, one field allowing several values.
-    const byField = new Map<string, string[]>();
+    // Conditions arrive as repeatable f=<fieldId>:<op>:<value>.
+    // ops: eq (repeat for several values), has, bool, gte, lte, empty, notempty
+    const eqByField = new Map<string, string[]>();
     for (const raw of sp.getAll("f")) {
       const i = raw.indexOf(":");
       if (i < 1) continue;
-      const fid = raw.slice(0, i), val = raw.slice(i + 1);
-      byField.set(fid, [...(byField.get(fid) || []), val]);
-    }
-    for (const [fid, vals] of byField) {
+      const j = raw.indexOf(":", i + 1);
+      if (j < 0) continue;
+      const fid = raw.slice(0, i), op = raw.slice(i + 1, j), val = raw.slice(j + 1);
       const f = byId.get(fid);
       if (!f) continue;
+      const path = `data->>'${fid}'`;
+      const jpath = `data->'${fid}'`;
+      if (op === "eq") {
+        eqByField.set(fid, [...(eqByField.get(fid) || []), val]);
+      } else if (op === "has") {
+        params.push("%" + val + "%");
+        where.push(`${path} ilike $${params.length}`);
+      } else if (op === "bool") {
+        params.push(val === "true");
+        where.push(`coalesce((${jpath})::boolean, false) = $${params.length}`);
+      } else if (op === "gte" || op === "lte") {
+        const cmp = op === "gte" ? ">=" : "<=";
+        if (isNumber(f.type)) {
+          params.push(Number(val));
+          where.push(`(nullif(${path},''))::numeric ${cmp} $${params.length}`);
+        } else {
+          params.push(val);
+          where.push(`(nullif(${path},''))::timestamptz ${cmp} $${params.length}::timestamptz`);
+        }
+      } else if (op === "empty") {
+        where.push(`(${jpath} is null or ${path} = '' or ${jpath} = '[]'::jsonb)`);
+      } else if (op === "notempty") {
+        where.push(`(${jpath} is not null and ${path} <> '' and ${jpath} <> '[]'::jsonb)`);
+      }
+    }
+    for (const [fid, vals] of eqByField) {
+      const f = byId.get(fid)!;
       if (f.type === "multipleSelects") {
-        // jsonb array contains any of the chosen values
         const ors = vals.map((v) => { params.push(JSON.stringify([v])); return `data->'${fid}' @> $${params.length}::jsonb`; });
         where.push("(" + ors.join(" or ") + ")");
-      } else if (f.type === "checkbox") {
-        params.push(vals[0] === "true");
-        where.push(`coalesce((data->'${fid}')::boolean, false) = $${params.length}`);
       } else {
         params.push(vals);
         where.push(`data->>'${fid}' = any($${params.length}::text[])`);

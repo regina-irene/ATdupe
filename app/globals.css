@@ -284,3 +284,5 @@ table.data th.money{text-align:right}
 :root[data-mode=dark] .card[data-tone=case]{--tone:#fb923c}
 .topbar nav{overflow-x:auto;scrollbar-width:none}
 .topbar nav::-webkit-scrollbar{display:none}
+.filterrow{align-items:flex-end;gap:7px;margin-top:7px;padding:7px;border:1px solid var(--line);border-radius:var(--rs);background:var(--panel-2)}
+.ms .mspanel .msitem{cursor:pointer}
