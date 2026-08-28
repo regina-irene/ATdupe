@@ -34,7 +34,11 @@ export default function Nav({ name }: { name?: string }) {
   return (
     <>
       <div className="topbar noprint">
-        <div className="brand"><span className="dot">E</span> Time Board</div>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/efl-logo.png" alt="Edwards Family Law" className="logo" width={26} height={26} />
+          EFL Board
+        </div>
         <nav>
           {top("/", "Time", "time")}
           {top("/tasks", "Tasks", "tasks")}

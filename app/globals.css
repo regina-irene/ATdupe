@@ -30,7 +30,7 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:I
 a{color:var(--accent)}
 .topbar{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:var(--on-accent);padding:0 16px;height:46px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
 .topbar .brand{font-weight:700;font-size:14px;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;white-space:nowrap}
-.topbar .brand .dot{width:16px;height:16px;border-radius:5px;background:var(--page);display:grid;place-items:center;color:#fff;font-size:10px;font-weight:800;transition:background .15s}
+.topbar .brand .logo{width:26px;height:26px;border-radius:50%;background:#fff;padding:1px;object-fit:contain;display:block;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
 .topbar nav{display:flex;gap:2px;flex:1}
 .topbar nav a{color:rgba(255,255,255,.78);text-decoration:none;padding:5px 12px;border-radius:7px;font-weight:500;font-size:12.5px;transition:.12s;position:relative}
 .topbar nav a:hover{background:rgba(255,255,255,.14);color:#fff}

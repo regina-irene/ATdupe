@@ -1,7 +1,11 @@
 export default function SetupNotice({ missing }: { missing: string[] }) {
   return (
     <>
-      <div className="topbar"><div className="brand"><span className="dot">E</span> Time Board</div><nav /></div>
+      <div className="topbar"><div className="brand">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/efl-logo.png" alt="Edwards Family Law" className="logo" width={26} height={26} />
+        EFL Board
+      </div><nav /></div>
       <div className="pagebar" />
       <div className="wrap narrow"><div className="card" data-tone="status">
         <h3>Almost there</h3>

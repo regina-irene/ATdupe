@@ -1,12 +1,15 @@
-# EFL Time Board
+# EFL Board
 
-Time and task capture for Edwards Family Law, replacing the Airtable Time table.
+Time, tasks, payments, cases and clients for Edwards Family Law, mirroring the Airtable base.
 Next.js App Router, deployed on Vercel, data in Neon Postgres, two-way sync with Airtable.
 
 ## Pages
 - **Time** - Board (capture and edit entries), Reports, Data (CSV / Excel export)
 - **Tasks** - the Airtable Tasks table, with saved views and a Modified column
-- **Setup** - environment status, time sync, task sync, import and wipe controls
+- **Payments** - firm income, two-way, with Airtable's formula splits read-only
+- **Cases** - the Status table, every field, with a column picker
+- **Clients** - the Clients table, every field, with a column picker
+- **Setup** - environment status, sync controls, import and wipe
 
 ## Environment variables (set in Vercel)
 | Name | Required | Purpose |
@@ -15,7 +18,7 @@ Next.js App Router, deployed on Vercel, data in Neon Postgres, two-way sync with
 | `AUTH_SECRET` | yes | Signs the session cookie |
 | `GOOGLE_CLIENT_ID` | yes | Google sign-in |
 | `GOOGLE_CLIENT_SECRET` | yes | Google sign-in |
-| `AIRTABLE_TOKEN` | yes | Needs data.records:read and data.records:write |
+| `AIRTABLE_TOKEN` | yes | Needs data.records:read, data.records:write and schema.bases:read |
 | `ANTHROPIC_API_KEY` | no | Powers the Make billing ready button |
 | `APP_URL` | no | Pins the sign-in address, e.g. https://efl-time-board-edwardslaw.vercel.app |
 | `API_TOKEN` | no | Lets outside automations post time entries |

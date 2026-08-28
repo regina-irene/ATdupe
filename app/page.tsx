@@ -17,7 +17,7 @@ export default async function Page() {
   const session = await getSession();
   if (!session) {
     return (<><Nav /><div className="wrap"><div className="signin"><div className="card" data-tone="list">
-      <h1>EFL Time Board</h1>
+      <h1>EFL Board</h1>
       <p className="muted small">Sign in with your Edwards Family Law Google account.</p>
       <p><a className="btn primary" href="/api/auth/login">Sign in with Google</a></p>
     </div></div></div></>);

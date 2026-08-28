@@ -1,6 +1,6 @@
 import "./globals.css";
 
-export const metadata = { title: "EFL Time Board", description: "Time and tasks for Edwards Family Law", manifest: "/manifest.json" };
+export const metadata = { title: "EFL Board", description: "Time, tasks, payments, cases and clients for Edwards Family Law", manifest: "/manifest.json", icons: { icon: "/efl-logo.png", apple: "/efl-logo.png" } };
 export const viewport = { width: "device-width", initialScale: 1, themeColor: "#1f3a5f" };
 
 const BOOT = `(function(){try{var r=document.documentElement;r.setAttribute('data-accent',localStorage.getItem('efl_accent')||'navy');r.setAttribute('data-density',localStorage.getItem('efl_density')||'cozy');var m=localStorage.getItem('efl_mode')||'light';r.setAttribute('data-mode',m==='auto'?(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):m);var p=location.pathname;r.setAttribute('data-page',p==='/'?'board':p.indexOf('/reports')===0?'reports':p.indexOf('/import')===0?'import':p.indexOf('/tasks')===0?'tasks':p.indexOf('/setup')===0?'setup':'board');}catch(e){}})();`;
