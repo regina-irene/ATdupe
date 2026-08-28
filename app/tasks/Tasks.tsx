@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_USERS, prioClass } from "../../lib/constants";
+import MultiSelect from "../MultiSelect";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
 const todayStr = () => {
@@ -27,7 +28,11 @@ function stamp(v: any): string {
 
 type View = { id: number; name: string; owner?: string; params: any };
 
-const BLANK = { who: "", status: "", priority: "", caseQ: "", q: "", showClosed: false, sort: "order", dir: "asc" };
+// Saved views created before multi-select held a single string.
+const asList = (v: any): string[] =>
+  Array.isArray(v) ? [...v].sort() : v ? [String(v)] : [];
+
+const BLANK = { who: "", status: [] as string[], priority: [] as string[], caseQ: "", q: "", showClosed: false, sort: "order", dir: "asc" };
 
 const DEFAULT_DIR: Record<string, string> = {
   order: "asc", priority: "asc", case: "asc", task: "asc",
@@ -64,8 +69,8 @@ export default function Tasks() {
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
 
   const [who, setWho] = useState("");
-  const [status, setStatus] = useState("");
-  const [priority, setPriority] = useState("");
+  const [status, setStatus] = useState<string[]>([]);
+  const [priority, setPriority] = useState<string[]>([]);
   const [caseQ, setCaseQ] = useState("");
   const [q, setQ] = useState("");
   const [showClosed, setShowClosed] = useState(false);
@@ -122,8 +127,8 @@ export default function Tasks() {
   const qs = useMemo(() => {
     const p = new URLSearchParams();
     if (who) p.set("who", who);
-    if (status) p.set("status", status);
-    if (priority) p.set("priority", priority);
+    status.forEach((v) => p.append("status", v));
+    priority.forEach((v) => p.append("priority", v));
     if (caseQ) p.set("case", caseQ);
     if (q) p.set("q", q);
     if (showClosed) p.set("closed", "1");
@@ -167,8 +172,8 @@ export default function Tasks() {
   function applyParams(params: any) {
     const p = { ...BLANK, ...(params || {}) };
     setWho(p.who || "");
-    setStatus(p.status || "");
-    setPriority(p.priority || "");
+    setStatus(asList(p.status));
+    setPriority(asList(p.priority));
     setCaseQ(p.caseQ || "");
     setQ(p.q || "");
     setShowClosed(!!p.showClosed);
@@ -305,18 +310,10 @@ export default function Tasks() {
           <button className={"chip " + (showClosed ? "on" : "")} onClick={() => { setShowClosed(!showClosed); setPage(1); }}>{showClosed ? "Showing closed" : "Open only"}</button>
         </div>
         <div className="grid g4" style={{ marginTop: 9 }}>
-          <div><label className="f">Status</label>
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-              <option value="">All statuses</option>
-              {meta.statuses.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div><label className="f">Priority</label>
-            <select value={priority} onChange={(e) => { setPriority(e.target.value); setPage(1); }}>
-              <option value="">All priorities</option>
-              {meta.priorities.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          <MultiSelect label="Status" allLabel="All statuses" options={meta.statuses}
+            value={status} onChange={(v) => { setStatus(v); setPage(1); }} />
+          <MultiSelect label="Priority" allLabel="All priorities" options={meta.priorities}
+            value={priority} onChange={(v) => { setPriority(v); setPage(1); }} />
           <div><label className="f">Case contains</label><input type="search" value={caseQ} onChange={(e) => { setCaseQ(e.target.value); setPage(1); }} placeholder="e.g. Nichols" /></div>
           <div><label className="f">Task text contains</label><input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="e.g. discovery" /></div>
         </div>

@@ -28,14 +28,18 @@ export async function GET(req: Request) {
     const add = (c: string, v: any) => { params.push(v); where.push(c.replace("?", "$" + params.length)); };
 
     if (sp.get("case")) add("case_name ilike ?", "%" + sp.get("case") + "%");
-    if (sp.get("kind")) add("kind = ?", sp.get("kind"));
-    if (sp.get("method")) add("method = ?", sp.get("method"));
-    if (sp.get("type")) add("case_type = ?", sp.get("type"));
-    if (sp.get("cleared")) add("cleared = ?", sp.get("cleared"));
+    const many = (name: string, col: string, cast = "text") => {
+      const vals = sp.getAll(name).filter(Boolean);
+      if (vals.length) add(`${col} = any(?::${cast}[])`, vals);
+    };
+    many("kind", "kind");
+    many("method", "method");
+    many("type", "case_type");
+    many("cleared", "cleared");
     if (sp.get("q")) add("notes ilike ?", "%" + sp.get("q") + "%");
     if (sp.get("from")) add("pay_date >= ?::date", sp.get("from"));
     if (sp.get("to")) add("pay_date <= ?::date", sp.get("to"));
-    if (sp.get("year")) add("year = ?::int", sp.get("year"));
+    many("year", "year", "int");
 
     const sql = where.length ? "where " + where.join(" and ") : "";
     const col = COL[sp.get("sort") || "date"] || COL.date;

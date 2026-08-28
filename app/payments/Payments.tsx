@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import MultiSelect from "../MultiSelect";
 
 const money = (v: any) =>
   v === null || v === undefined || v === "" ? "" :
@@ -48,11 +49,11 @@ export default function Payments() {
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
 
   const [caseQ, setCaseQ] = useState("");
-  const [kind, setKind] = useState("");
-  const [method, setMethod] = useState("");
-  const [type, setType] = useState("");
-  const [cleared, setCleared] = useState("");
-  const [year, setYear] = useState("");
+  const [kind, setKind] = useState<string[]>([]);
+  const [method, setMethod] = useState<string[]>([]);
+  const [type, setType] = useState<string[]>([]);
+  const [cleared, setCleared] = useState<string[]>([]);
+  const [year, setYear] = useState<string[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
@@ -97,11 +98,11 @@ export default function Payments() {
   const qs = useMemo(() => {
     const p = new URLSearchParams();
     if (caseQ) p.set("case", caseQ);
-    if (kind) p.set("kind", kind);
-    if (method) p.set("method", method);
-    if (type) p.set("type", type);
-    if (cleared) p.set("cleared", cleared);
-    if (year) p.set("year", year);
+    kind.forEach((v) => p.append("kind", v));
+    method.forEach((v) => p.append("method", v));
+    type.forEach((v) => p.append("type", v));
+    cleared.forEach((v) => p.append("cleared", v));
+    year.forEach((v) => p.append("year", v));
     if (from) p.set("from", from);
     if (to) p.set("to", to);
     if (q) p.set("q", q);
@@ -139,8 +140,8 @@ export default function Payments() {
     setPage(1);
   }
   function clearFilters() {
-    setCaseQ(""); setKind(""); setMethod(""); setType(""); setCleared("");
-    setYear(""); setFrom(""); setTo(""); setQ(""); setPage(1);
+    setCaseQ(""); setKind([]); setMethod([]); setType([]); setCleared([]);
+    setYear([]); setFrom(""); setTo(""); setQ(""); setPage(1);
   }
 
   async function addPayment() {
@@ -192,13 +193,9 @@ export default function Payments() {
     }
   }
 
-  const pick = (v: string, set: (s: string) => void, label: string, opts: any[]) => (
-    <div><label className="f">{label}</label>
-      <select value={v} onChange={(e) => { set(e.target.value); setPage(1); }}>
-        <option value="">All</option>
-        {opts.map((o) => <option key={String(o)} value={String(o)}>{String(o)}</option>)}
-      </select>
-    </div>
+  const pick = (v: string[], set: (s: string[]) => void, label: string, opts: any[], allLabel: string) => (
+    <MultiSelect label={label} allLabel={allLabel} options={opts}
+      value={v} onChange={(next) => { set(next); setPage(1); }} />
   );
 
   return (
@@ -261,13 +258,13 @@ export default function Payments() {
         <h2>Filters</h2>
         <div className="grid g4">
           <div><label className="f">Case contains</label><input type="search" value={caseQ} onChange={(e) => { setCaseQ(e.target.value); setPage(1); }} placeholder="e.g. Bunting" /></div>
-          {pick(kind, setKind, "Type of payment", meta.kinds)}
-          {pick(method, setMethod, "Payment method", meta.methods)}
-          {pick(type, setType, "Case type", meta.types)}
+          {pick(kind, setKind, "Type of payment", meta.kinds, "All types")}
+          {pick(method, setMethod, "Payment method", meta.methods, "All methods")}
+          {pick(type, setType, "Case type", meta.types, "All case types")}
         </div>
         <div className="grid g4" style={{ marginTop: 7 }}>
-          {pick(cleared, setCleared, "Cleared?", meta.cleared)}
-          {pick(year, setYear, "Year", meta.years)}
+          {pick(cleared, setCleared, "Cleared?", meta.cleared, "Any")}
+          {pick(year, setYear, "Year", meta.years, "All years")}
           <div><label className="f">From</label><input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} /></div>
           <div><label className="f">To</label><input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} /></div>
         </div>

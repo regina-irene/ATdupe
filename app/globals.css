@@ -181,3 +181,17 @@ table.data th:hover .grip{opacity:.6}
 :root[data-mode=dark] .card[data-tone=pay]{--tone:#34d399}
 table.data td.money{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 table.data th.money{text-align:right}
+.ms{position:relative}
+.msbtn{width:100%;display:flex;align-items:center;gap:6px;padding:var(--ctl);border:1px solid var(--line);border-radius:var(--rs);background:var(--panel);color:var(--ink);cursor:pointer;font-size:13px;text-align:left}
+.msbtn:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.msbtn.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.msbtn .mstext{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msbtn .mscaret{opacity:.5;font-size:10px}
+.mspanel{position:absolute;z-index:40;top:100%;left:0;min-width:100%;width:max-content;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:var(--rs);box-shadow:var(--sh-lg);margin-top:4px;padding:7px}
+.mspanel input[type=search]{margin-bottom:6px}
+.msrow{display:flex;align-items:center;gap:5px;margin-bottom:5px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.mslist{max-height:264px;overflow-y:auto}
+.msitem{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:5px;cursor:pointer;font-size:13px}
+.msitem:hover{background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.msitem input{width:auto;margin:0;cursor:pointer}
+.msitem span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

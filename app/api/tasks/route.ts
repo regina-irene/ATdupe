@@ -30,8 +30,10 @@ export async function GET(req: Request) {
 
     if (sp.get("closed") !== "1") where.push("closed = false");
     if (sp.get("who")) add("who ilike ?", "%" + sp.get("who") + "%");
-    if (sp.get("status")) add("status = ?", sp.get("status"));
-    if (sp.get("priority")) add("priority = ?", sp.get("priority"));
+    const statuses = sp.getAll("status").filter(Boolean);
+    if (statuses.length) add("status = any(?::text[])", statuses);
+    const priorities = sp.getAll("priority").filter(Boolean);
+    if (priorities.length) add("priority = any(?::text[])", priorities);
     if (sp.get("case")) add("(case_name ilike ? or client_name ilike ?)".replace("?", "$X"), null);
     if (sp.get("case")) {
       where.pop(); params.pop();
