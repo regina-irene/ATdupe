@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FIRMS, KINDS, QUICK_HOURS, KIND_CLASS } from "../lib/constants";
+import { FIRMS, KINDS, QUICK_HOURS, CF } from "../lib/constants";
+import Chip, { useChoices } from "./Chip";
 
 function today() {
   const d = new Date();
@@ -63,6 +64,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
+  const choices = useChoices();
   const [polishing, setPolishing] = useState(false);
   const [draftText, setDraftText] = useState<string | null>(null);
 
@@ -333,7 +335,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
                   <td>{r.time_entry}{r.url ? <> <a href={r.url} target="_blank" rel="noreferrer" className="small noprint">link</a></> : null}</td>
                   <td className="num">{r.duration === null ? "" : Number(r.duration).toFixed(2)}</td>
                   <td className="who">{r.user_name}</td>
-                  <td>{r.kind ? <span className={"tag " + (KIND_CLASS[r.kind] || "")}>{r.kind}</span> : null}</td>
+                  <td><Chip v={r.kind} colors={choices[CF.timeKind]} dash={false} /></td>
                   <td className="noprint"><button className="btn ghost sm" onClick={() => { setEditing(r.id); setDraft({ entry_date: d10(r.entry_date), case_name: r.case_name, time_entry: r.time_entry, duration: r.duration, kind: r.kind, firm: r.firm, user_name: r.user_name }); }}>Edit</button></td>
                 </tr>
               ))}

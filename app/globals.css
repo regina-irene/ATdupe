@@ -195,3 +195,84 @@ table.data th.money{text-align:right}
 .msitem:hover{background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
 .msitem input{width:auto;margin:0;cursor:pointer}
 .msitem span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-blueLight2{background:#ddebfe;color:#1c4f9a}
+.sel-blueLight1{background:#b8d3fd;color:#1c4f9a}
+.sel-blueBright{background:#2d7ff9;color:#ffffff}
+.sel-blueDark1{background:#1c4f9a;color:#ffffff}
+.sel-cyanLight2{background:#daf5ff;color:#0f769e}
+.sel-cyanLight1{background:#b0e9ff;color:#0f769e}
+.sel-cyanBright{background:#18bfff;color:#ffffff}
+.sel-cyanDark1{background:#0f769e;color:#ffffff}
+.sel-tealLight2{background:#dbf9f8;color:#148782}
+.sel-tealLight1{background:#b3f2f0;color:#148782}
+.sel-tealBright{background:#20d9d2;color:#1a2230}
+.sel-tealDark1{background:#148782;color:#ffffff}
+.sel-greenLight2{background:#dbf6de;color:#147d20}
+.sel-greenLight1{background:#b3edba;color:#147d20}
+.sel-greenBright{background:#20c933;color:#ffffff}
+.sel-greenDark1{background:#147d20;color:#ffffff}
+.sel-yellowLight2{background:#fff3d6;color:#9c7000}
+.sel-yellowLight1{background:#fee6a8;color:#9c7000}
+.sel-yellowBright{background:#fcb400;color:#1a2230}
+.sel-yellowDark1{background:#9c7000;color:#ffffff}
+.sel-orangeLight2{background:#ffe8dd;color:#9e451b}
+.sel-orangeLight1{background:#ffceb7;color:#9e451b}
+.sel-orangeBright{background:#ff6f2c;color:#ffffff}
+.sel-orangeDark1{background:#9e451b;color:#ffffff}
+.sel-redLight2{background:#fedde6;color:#9a1b3c}
+.sel-redLight1{background:#fdb7c9;color:#9a1b3c}
+.sel-redBright{background:#f82b60;color:#ffffff}
+.sel-redDark1{background:#9a1b3c;color:#ffffff}
+.sel-pinkLight2{background:#ffd7f5;color:#9e0578}
+.sel-pinkLight1{background:#ffabea;color:#9e0578}
+.sel-pinkBright{background:#ff08c2;color:#ffffff}
+.sel-pinkDark1{background:#9e0578;color:#ffffff}
+.sel-purpleLight2{background:#ece1ff;color:#562b9e}
+.sel-purpleLight1{background:#d8c0ff;color:#562b9e}
+.sel-purpleBright{background:#8b46ff;color:#ffffff}
+.sel-purpleDark1{background:#562b9e;color:#ffffff}
+.sel-grayLight2{background:#eceef0;color:#565b64}
+.sel-grayLight1{background:#d8dadf;color:#565b64}
+.sel-grayBright{background:#8b93a1;color:#ffffff}
+.sel-grayDark1{background:#565b64;color:#ffffff}
+:root[data-mode=dark] .sel-blueLight2{background:#1a355c;color:#a7c9fc}
+:root[data-mode=dark] .sel-blueLight1{background:#1a355c;color:#a7c9fc}
+:root[data-mode=dark] .sel-blueBright{background:#1a355c;color:#a7c9fc}
+:root[data-mode=dark] .sel-blueDark1{background:#1a355c;color:#a7c9fc}
+:root[data-mode=dark] .sel-cyanLight2{background:#15465e;color:#9ee4ff}
+:root[data-mode=dark] .sel-cyanLight1{background:#15465e;color:#9ee4ff}
+:root[data-mode=dark] .sel-cyanBright{background:#15465e;color:#9ee4ff}
+:root[data-mode=dark] .sel-cyanDark1{background:#15465e;color:#9ee4ff}
+:root[data-mode=dark] .sel-tealLight2{background:#174c52;color:#a1efec}
+:root[data-mode=dark] .sel-tealLight1{background:#174c52;color:#a1efec}
+:root[data-mode=dark] .sel-tealBright{background:#174c52;color:#a1efec}
+:root[data-mode=dark] .sel-tealDark1{background:#174c52;color:#a1efec}
+:root[data-mode=dark] .sel-greenLight2{background:#174829;color:#a1e8a9}
+:root[data-mode=dark] .sel-greenLight1{background:#174829;color:#a1e8a9}
+:root[data-mode=dark] .sel-greenBright{background:#174829;color:#a1e8a9}
+:root[data-mode=dark] .sel-greenDark1{background:#174829;color:#a1e8a9}
+:root[data-mode=dark] .sel-yellowLight2{background:#50431b;color:#fee094}
+:root[data-mode=dark] .sel-yellowLight1{background:#50431b;color:#fee094}
+:root[data-mode=dark] .sel-yellowBright{background:#50431b;color:#fee094}
+:root[data-mode=dark] .sel-yellowDark1{background:#50431b;color:#fee094}
+:root[data-mode=dark] .sel-orangeLight2{background:#513127;color:#ffc3a6}
+:root[data-mode=dark] .sel-orangeLight1{background:#513127;color:#ffc3a6}
+:root[data-mode=dark] .sel-orangeBright{background:#513127;color:#ffc3a6}
+:root[data-mode=dark] .sel-orangeDark1{background:#513127;color:#ffc3a6}
+:root[data-mode=dark] .sel-redLight2{background:#4f1f34;color:#fca6bc}
+:root[data-mode=dark] .sel-redLight1{background:#4f1f34;color:#fca6bc}
+:root[data-mode=dark] .sel-redBright{background:#4f1f34;color:#fca6bc}
+:root[data-mode=dark] .sel-redDark1{background:#4f1f34;color:#fca6bc}
+:root[data-mode=dark] .sel-pinkLight2{background:#51164e;color:#ff97e5}
+:root[data-mode=dark] .sel-pinkLight1{background:#51164e;color:#ff97e5}
+:root[data-mode=dark] .sel-pinkBright{background:#51164e;color:#ff97e5}
+:root[data-mode=dark] .sel-pinkDark1{background:#51164e;color:#ff97e5}
+:root[data-mode=dark] .sel-purpleLight2{background:#33265e;color:#ceb1ff}
+:root[data-mode=dark] .sel-purpleLight1{background:#33265e;color:#ceb1ff}
+:root[data-mode=dark] .sel-purpleBright{background:#33265e;color:#ceb1ff}
+:root[data-mode=dark] .sel-purpleDark1{background:#33265e;color:#ceb1ff}
+:root[data-mode=dark] .sel-grayLight2{background:#333a45;color:#ced2d8}
+:root[data-mode=dark] .sel-grayLight1{background:#333a45;color:#ced2d8}
+:root[data-mode=dark] .sel-grayBright{background:#333a45;color:#ced2d8}
+:root[data-mode=dark] .sel-grayDark1{background:#333a45;color:#ced2d8}
+.tag+.tag{margin-left:4px}

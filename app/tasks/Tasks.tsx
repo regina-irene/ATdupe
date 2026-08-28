@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_USERS, prioClass } from "../../lib/constants";
 import MultiSelect from "../MultiSelect";
+import Chip, { useChoices } from "../Chip";
+import { CF } from "../../lib/constants";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
 const todayStr = () => {
@@ -91,6 +93,7 @@ export default function Tasks() {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
+  const choices = useChoices();
 
   // Restore the saved column layout, dropping anything unrecognised and
   // appending any column added since the layout was saved.
@@ -242,15 +245,15 @@ export default function Tasks() {
           <input type="checkbox" checked={!!t.closed} title={t.closed ? "Reopen this task" : "Mark this task done"} onChange={() => toggleClosed(t)} />
         </td>;
       case "priority":
-        return <td key={id} className="small">{t.priority || <span className="muted">-</span>}</td>;
+        return <td key={id} className="small"><Chip v={t.priority} colors={choices[CF.taskPriority]} /></td>;
       case "case":
         return <td key={id}>{t.case_name || t.client_name || <span className="muted">-</span>}</td>;
       case "task":
         return <td key={id}>{t.task}{t.link ? <> <a href={t.link} target="_blank" rel="noreferrer" className="small noprint">file</a></> : null}</td>;
       case "status":
-        return <td key={id} className="small">{t.status || <span className="muted">-</span>}</td>;
+        return <td key={id} className="small"><Chip v={t.status} colors={choices[CF.taskStatus]} /></td>;
       case "who":
-        return <td key={id} className="who">{t.who}</td>;
+        return <td key={id} className="who"><Chip v={t.who} colors={choices[CF.taskWho]} dash={false} /></td>;
       case "due":
         return <td key={id} className="date">{d10(t.due_date)}</td>;
       case "modified":

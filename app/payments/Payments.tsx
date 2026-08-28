@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MultiSelect from "../MultiSelect";
+import Chip, { useChoices } from "../Chip";
+import { CF } from "../../lib/constants";
 
 const money = (v: any) =>
   v === null || v === undefined || v === "" ? "" :
@@ -72,6 +74,7 @@ export default function Payments() {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
+  const choices = useChoices();
 
   useEffect(() => {
     try {
@@ -179,10 +182,10 @@ export default function Payments() {
       case "date": return <td key={id} className="date">{p.pay_date || ""}</td>;
       case "case": return <td key={id}>{p.case_name || <span className="muted">-</span>}</td>;
       case "amount": return <td key={id} className="money"><b>{money(p.amount)}</b></td>;
-      case "kind": return <td key={id} className="small">{p.kind || <span className="muted">-</span>}</td>;
-      case "method": return <td key={id} className="small">{p.method || <span className="muted">-</span>}</td>;
-      case "type": return <td key={id} className="small">{p.case_type || <span className="muted">-</span>}</td>;
-      case "cleared": return <td key={id} className="small">{p.cleared || <span className="muted">-</span>}</td>;
+      case "kind": return <td key={id} className="small"><Chip v={p.kind} colors={choices[CF.payKind]} /></td>;
+      case "method": return <td key={id} className="small"><Chip v={p.method} colors={choices[CF.payMethod]} /></td>;
+      case "type": return <td key={id} className="small"><Chip v={p.case_type} colors={choices[CF.payType]} /></td>;
+      case "cleared": return <td key={id} className="small"><Chip v={p.cleared} colors={choices[CF.payCleared]} /></td>;
       case "notes": return <td key={id} className="small">{p.notes}</td>;
       case "profit": return <td key={id} className="money muted">{money(p.profit)}</td>;
       case "owner": return <td key={id} className="money muted">{money(p.owner_pay)}</td>;

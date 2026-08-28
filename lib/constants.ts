@@ -19,3 +19,17 @@ export function prioClass(p?: string | null): string {
   if (s.indexOf("waiting") >= 0) return "pw";
   return "";
 }
+
+// Airtable single/multi select fields whose choice colours the boards mirror.
+export const CF = {
+  timeFirm: "fldf6CVPh3l1RjDwq",
+  timeKind: "fld7ovIkeXLhjfsFg",
+  taskStatus: "fldMTlXyunzRxAbdQ",
+  taskPriority: "fldeVCHkvVCFk934g",
+  taskWho: "fld9Ee4nMHzcdNtoX",
+  payKind: "fldgPNgbi1w1okG93",
+  payMethod: "fldqLeWEnjkIEoQ6Q",
+  payType: "fldUausxqBTzPyEcL",
+  payCleared: "fldnB2GyHOimHEt3d",
+};
+export const CHOICE_FIELDS = Object.values(CF);
