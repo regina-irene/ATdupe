@@ -8,20 +8,16 @@ const todayStr = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
-// Short, glanceable "when did this last change".
-function ago(v: any): string {
+// Modified column: an actual date and time, e.g. 8/28/26 3:42 PM.
+function when(v: any): string {
   if (!v) return "";
-  const t = new Date(v).getTime();
-  if (isNaN(t)) return "";
-  const s = Math.floor((Date.now() - t) / 1000);
-  if (s < 90) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return m + "m ago";
-  const h = Math.floor(m / 60);
-  if (h < 24) return h + "h ago";
-  const d = Math.floor(h / 24);
-  if (d < 7) return d + "d ago";
-  return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const t = new Date(v);
+  if (isNaN(t.getTime())) return "";
+  const y = String(t.getFullYear()).slice(2);
+  const mins = String(t.getMinutes()).padStart(2, "0");
+  const ap = t.getHours() >= 12 ? "PM" : "AM";
+  const h12 = t.getHours() % 12 || 12;
+  return `${t.getMonth() + 1}/${t.getDate()}/${y} ${h12}:${mins} ${ap}`;
 }
 function stamp(v: any): string {
   if (!v) return "";
@@ -32,6 +28,15 @@ function stamp(v: any): string {
 type View = { id: number; name: string; owner?: string; params: any };
 
 const BLANK = { who: "", status: "", priority: "", caseQ: "", q: "", showClosed: false, sort: "order" };
+
+// Always-there buttons for the groups asked for most often.
+const QUICK: { name: string; params: any }[] = [
+  { name: "RIE open", params: { ...BLANK, who: "RIE" } },
+  { name: "KW open", params: { ...BLANK, who: "KW" } },
+  { name: "KV open", params: { ...BLANK, who: "KV" } },
+  { name: "By due date", params: { ...BLANK, sort: "due" } },
+  { name: "Recently changed", params: { ...BLANK, sort: "modified" } },
+];
 
 export default function Tasks() {
   const [rows, setRows] = useState<any[]>([]);
@@ -98,8 +103,8 @@ export default function Tasks() {
   }, []);
   useEffect(() => { loadViews(); }, [loadViews]);
 
-  function applyView(v: View) {
-    const p = { ...BLANK, ...(v.params || {}) };
+  function applyParams(params: any) {
+    const p = { ...BLANK, ...(params || {}) };
     setWho(p.who || "");
     setStatus(p.status || "");
     setPriority(p.priority || "");
@@ -113,8 +118,8 @@ export default function Tasks() {
     setWho(""); setStatus(""); setPriority(""); setCaseQ(""); setQ("");
     setShowClosed(false); setSort("order"); setPage(1);
   }
-  function matches(v: View) {
-    return JSON.stringify({ ...BLANK, ...(v.params || {}) }) === JSON.stringify(current);
+  function matchesParams(params: any) {
+    return JSON.stringify({ ...BLANK, ...(params || {}) }) === JSON.stringify(current);
   }
 
   async function saveView() {
@@ -174,13 +179,17 @@ export default function Tasks() {
         <div className="row">
           <div className="chips nowrap" style={{ marginTop: 0 }}>
             <button className={"chip " + (isBlank ? "on" : "")} onClick={clearAll}>All open</button>
+            {QUICK.map((v) => (
+              <button key={v.name} className={"chip " + (matchesParams(v.params) ? "on" : "")} onClick={() => applyParams(v.params)}>{v.name}</button>
+            ))}
+            <span className="sep" />
             {views.map((v) => (
               <span key={v.id} className="viewchip">
-                <button className={"chip " + (matches(v) ? "on" : "")} title={v.owner ? "Saved by " + v.owner : ""} onClick={() => applyView(v)}>{v.name}</button>
+                <button className={"chip " + (matchesParams(v.params) ? "on" : "")} title={v.owner ? "Saved by " + v.owner : ""} onClick={() => applyParams(v.params)}>{v.name}</button>
                 <button className="x" title={"Delete the view " + v.name} onClick={() => deleteView(v)}>&times;</button>
               </span>
             ))}
-            {views.length === 0 ? <span className="muted small">Set your filters below, then save them here as a one-click button.</span> : null}
+            {views.length === 0 ? <span className="muted small">Set filters below, then Save these filters to add your own button here.</span> : null}
           </div>
           <div className="spacer" />
           {naming ? (
@@ -255,7 +264,7 @@ export default function Tasks() {
               <th style={{ width: 170 }}>Status</th>
               <th style={{ width: 62 }}>Who</th>
               <th style={{ width: 88 }}>Due</th>
-              <th style={{ width: 92 }}>Modified</th>
+              <th style={{ width: 118 }}>Modified</th>
               <th className="noprint" style={{ width: 120 }}></th>
             </tr></thead>
             <tbody>
@@ -300,7 +309,7 @@ export default function Tasks() {
                   <td className="small">{t.status || <span className="muted">-</span>}</td>
                   <td className="who">{t.who}</td>
                   <td className="date">{d10(t.due_date)}</td>
-                  <td className="date muted" title={stamp(t.updated_at)}>{ago(t.updated_at)}</td>
+                  <td className="date muted nowrap" title={stamp(t.updated_at)}>{when(t.updated_at)}</td>
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>
                     <button className="btn ghost sm" title={t.closed ? "Reopen" : "Mark closed"} onClick={() => toggleClosed(t)}>{t.closed ? "Reopen" : "Done"}</button>

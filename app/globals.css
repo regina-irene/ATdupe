@@ -169,3 +169,5 @@ pre{background:#0f172a;color:#e2e8f0;padding:11px;border-radius:var(--rs);overfl
 .viewchip .chip{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:-1px}
 .viewchip .x{border:1px solid var(--line);border-left:none;background:var(--panel);color:var(--muted);border-radius:0 999px 999px 0;padding:0 8px;cursor:pointer;font-size:14px;line-height:1;font-weight:600}
 .viewchip .x:hover{color:var(--danger);border-color:var(--danger)}
+.sep{display:inline-block;width:1px;align-self:stretch;background:var(--line);margin:0 3px}
+.nowrap{white-space:nowrap}
