@@ -11,7 +11,7 @@ const ORDER: Record<string, string> = {
   due: "due_date nulls last, ord nulls last",
   priority: "priority nulls last, ord nulls last",
   case: "lower(case_name) nulls last, ord nulls last",
-  modified: "updated_at desc",
+  modified: "coalesce(at_modified, updated_at) desc",
 };
 
 export async function GET(req: Request) {
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
 
     const rows = await q(
       `select id, airtable_id, client_name, case_name, task, status, priority, who, ord, closed,
-              to_char(due_date,'YYYY-MM-DD') as due_date, link, updated_at
+              to_char(due_date,'YYYY-MM-DD') as due_date, link, updated_at, at_modified
          from tasks ${sql} order by ${ord} limit ${pageSize} offset ${(page - 1) * pageSize}`,
       params
     );

@@ -41,19 +41,20 @@ async function upsertMany(recs: any[], byId: Map<string, string>) {
       due,
       plain(f[TF.link]),
       num(f[TF.duration]),
+      f[TF.modified] ? new Date(f[TF.modified]).toISOString() : null,
     ];
     const slots: string[] = [];
     for (const v of vals) { params.push(v); slots.push("$" + params.length); }
     tuples.push("(" + slots.join(",") + ",'airtable',now(),now())");
   }
   await db()(
-    `insert into tasks (airtable_id, client_name, case_name, case_id, task, status, priority, who, ord, closed, due_date, link, duration, source, synced_at, updated_at)
+    `insert into tasks (airtable_id, client_name, case_name, case_id, task, status, priority, who, ord, closed, due_date, link, duration, at_modified, source, synced_at, updated_at)
      values ${tuples.join(",")}
      on conflict (airtable_id) do update set
        client_name=excluded.client_name, case_name=excluded.case_name, case_id=excluded.case_id,
        task=excluded.task, status=excluded.status, priority=excluded.priority, who=excluded.who,
        ord=excluded.ord, closed=excluded.closed, due_date=excluded.due_date, link=excluded.link,
-       duration=excluded.duration, synced_at=now(),
+       duration=excluded.duration, at_modified=excluded.at_modified, synced_at=now(),
        updated_at = case when (tasks.client_name, tasks.case_name, tasks.case_id, tasks.task,
                                tasks.status, tasks.priority, tasks.who, tasks.ord, tasks.closed,
                                tasks.due_date, tasks.link, tasks.duration)

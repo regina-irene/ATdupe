@@ -309,7 +309,7 @@ export default function Tasks() {
                   <td className="small">{t.status || <span className="muted">-</span>}</td>
                   <td className="who">{t.who}</td>
                   <td className="date">{d10(t.due_date)}</td>
-                  <td className="date muted nowrap" title={stamp(t.updated_at)}>{when(t.updated_at)}</td>
+                  <td className="date muted nowrap" title={stamp(t.at_modified || t.updated_at)}>{when(t.at_modified || t.updated_at)}</td>
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>
                     <button className="btn ghost sm" title={t.closed ? "Reopen" : "Mark closed"} onClick={() => toggleClosed(t)}>{t.closed ? "Reopen" : "Done"}</button>

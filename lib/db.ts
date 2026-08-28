@@ -69,6 +69,7 @@ const STATEMENTS = [
      synced_at timestamptz,
      created_at timestamptz not null default now(),
      updated_at timestamptz not null default now())`,
+  `alter table tasks add column if not exists at_modified timestamptz`,
   `create unique index if not exists tk_airtable_idx on tasks (airtable_id)`,
   `create index if not exists tk_open_idx on tasks (closed, ord nulls last, id)`,
   `create index if not exists tk_who_idx on tasks (who)`,
