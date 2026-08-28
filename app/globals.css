@@ -10,12 +10,14 @@
 :root[data-page=reports]{--page:#0891b2}
 :root[data-page=import]{--page:#b45309}
 :root[data-page=tasks]{--page:#7c3aed}
+:root[data-page=payments]{--page:#047857}
 :root[data-page=setup]{--page:#0f766e}
 :root[data-mode=dark]{--bg:#0b1017;--panel:#141b25;--panel-2:#18202b;--ink:#e8eef7;--muted:#94a3b8;--line:#252f3d;--danger:#fb7185;--warn:#fbbf24;--good:#34d399;--sh:0 1px 2px rgba(0,0,0,.4);--sh-lg:0 10px 30px -10px rgba(0,0,0,.7)}
 :root[data-mode=dark][data-page=board]{--page:#60a5fa}
 :root[data-mode=dark][data-page=reports]{--page:#22d3ee}
 :root[data-mode=dark][data-page=import]{--page:#fbbf24}
 :root[data-mode=dark][data-page=tasks]{--page:#a78bfa}
+:root[data-mode=dark][data-page=payments]{--page:#34d399}
 :root[data-mode=dark][data-page=setup]{--page:#2dd4bf}
 :root[data-density=compact]{--pad:9px;--gap:7px;--ctl:4px 8px}
 :root[data-density=roomy]{--pad:16px;--gap:13px;--ctl:8px 11px}
@@ -175,3 +177,7 @@ table.data th.over{box-shadow:inset 3px 0 0 var(--accent)}
 table.data th.dragging{opacity:.45}
 table.data th .grip{opacity:.3;margin-right:5px;cursor:grab;font-size:10px}
 table.data th:hover .grip{opacity:.6}
+.card[data-tone=pay]{--tone:#047857}
+:root[data-mode=dark] .card[data-tone=pay]{--tone:#34d399}
+table.data td.money{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.data th.money{text-align:right}
