@@ -62,7 +62,8 @@ async function upsertMany(recs: any[], byId: Map<string, string>) {
                              (excluded.client_name, excluded.case_name, excluded.case_id, excluded.task,
                               excluded.status, excluded.priority, excluded.who, excluded.ord, excluded.closed,
                               excluded.due_date, excluded.link, excluded.duration)
-                    then now() else tasks.updated_at end`,
+                    then now() else tasks.updated_at end
+     where tasks.synced_at is null or tasks.updated_at <= tasks.synced_at`,
     params
   );
 }
@@ -75,17 +76,22 @@ async function run() {
   // Pull the whole Tasks table. It is small enough to sweep every run, which
   // means edits made in Airtable are picked up, not just new rows.
   let pulled = 0;
-  let offset: string | undefined;
-  do {
-    const p = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
-    if (offset) p.set("offset", offset);
-    const j = await at(BASE + "/" + TASK_TABLE + "?" + p.toString());
-    const recs = j.records || [];
-    await upsertMany(recs, byId);
-    pulled += recs.length;
-    offset = j.offset;
-    if (Date.now() - started > 200000) break;
-  } while (offset);
+  // Runs after the pushes below, so local edits reach Airtable first
+  // and the pull then brings back whatever Airtable made of them.
+  const doPull = async () => {
+      let offset: string | undefined;
+    do {
+      const p = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
+      if (offset) p.set("offset", offset);
+      const j = await at(BASE + "/" + TASK_TABLE + "?" + p.toString());
+      const recs = j.records || [];
+      await upsertMany(recs, byId);
+      pulled += recs.length;
+      offset = j.offset;
+      if (Date.now() - started > 200000) break;
+    } while (offset);
+  };
+
 
   function fieldsFor(t: any) {
     const out: any = {};
@@ -130,6 +136,8 @@ async function run() {
     pushedUpd += ids.length;
     await sleep(250);
   }
+
+  await doPull();
 
   const ms = Date.now() - started;
   await q("insert into sync_log (kind, pulled, pushed_new, pushed_upd, ms) values ('tasks',$1,$2,$3,$4)", [pulled, pushedNew, pushedUpd, ms]);

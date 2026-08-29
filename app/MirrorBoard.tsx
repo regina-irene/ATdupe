@@ -236,7 +236,9 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
       const r = await fetch("/api/sync/mirror/" + boardKey, { method: "POST" });
       const j = await r.json();
       if (j.error) throw new Error(j.error);
-      setMsg({ kind: "ok", text: `Pulled ${j.pulled} from Airtable, sent ${j.pushed_new} new and ${j.pushed_upd} updates.` });
+      const bits = [`Pulled ${j.pulled} from Airtable`, `sent ${j.pushed_new} new and ${j.pushed_upd} updates`];
+      if (j.not_sent) bits.push(`${j.not_sent} refused by Airtable`);
+      setMsg({ kind: j.not_sent ? "warn" : "ok", text: bits.join(", ") + "." + (j.problems?.length ? " " + j.problems[0] : "") });
       load();
     } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
     setSyncing(false);

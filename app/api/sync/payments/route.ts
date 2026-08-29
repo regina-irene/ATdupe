@@ -69,7 +69,8 @@ async function upsertMany(recs: any[], byId: Map<string, string>) {
                              (excluded.case_name, excluded.case_id, excluded.pay_date, excluded.amount,
                               excluded.kind, excluded.method, excluded.case_type, excluded.cleared,
                               excluded.notes, excluded.end_date)
-                    then now() else payments.updated_at end`,
+                    then now() else payments.updated_at end
+     where payments.synced_at is null or payments.updated_at <= payments.synced_at`,
     params
   );
 }
@@ -81,17 +82,22 @@ async function run() {
 
   // 1,591 rows today, so one full sweep per run keeps Airtable edits flowing in.
   let pulled = 0;
-  let offset: string | undefined;
-  do {
-    const p = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
-    if (offset) p.set("offset", offset);
-    const j = await at(BASE + "/" + PAY_TABLE + "?" + p.toString());
-    const recs = j.records || [];
-    await upsertMany(recs, byId);
-    pulled += recs.length;
-    offset = j.offset;
-    if (Date.now() - started > 200000) break;
-  } while (offset);
+  // Runs after the pushes below, so local edits reach Airtable first
+  // and the pull then brings back whatever Airtable made of them.
+  const doPull = async () => {
+      let offset: string | undefined;
+    do {
+      const p = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
+      if (offset) p.set("offset", offset);
+      const j = await at(BASE + "/" + PAY_TABLE + "?" + p.toString());
+      const recs = j.records || [];
+      await upsertMany(recs, byId);
+      pulled += recs.length;
+      offset = j.offset;
+      if (Date.now() - started > 200000) break;
+    } while (offset);
+  };
+
 
   // Only the fields Airtable does not calculate itself.
   function fieldsFor(p: any) {
@@ -134,6 +140,8 @@ async function run() {
     pushedUpd += ids.length;
     await sleep(250);
   }
+
+  await doPull();
 
   const ms = Date.now() - started;
   await q("insert into sync_log (kind, pulled, pushed_new, pushed_upd, ms) values ('payments',$1,$2,$3,$4)", [pulled, pushedNew, pushedUpd, ms]);

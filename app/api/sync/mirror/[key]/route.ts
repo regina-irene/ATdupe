@@ -27,7 +27,8 @@ async function upsertMany(key: string, recs: any[], modifiedField: string | null
      on conflict (table_key, airtable_id) do update set
        data = excluded.data, at_modified = excluded.at_modified, synced_at = now(),
        updated_at = case when mirror_rows.data is distinct from excluded.data
-                    then now() else mirror_rows.updated_at end`,
+                    then now() else mirror_rows.updated_at end
+     where mirror_rows.synced_at is null or mirror_rows.updated_at <= mirror_rows.synced_at`,
     params
   );
 }
@@ -41,17 +42,22 @@ async function run(key: string) {
   const modifiedField = fields.find((f) => f.type === "lastModifiedTime")?.id || null;
 
   let pulled = 0;
-  let offset: string | undefined;
-  do {
-    const p = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
-    if (offset) p.set("offset", offset);
-    const j = await at(cfg.base + "/" + cfg.table + "?" + p.toString());
-    const recs = j.records || [];
-    await upsertMany(key, recs, modifiedField);
-    pulled += recs.length;
-    offset = j.offset;
-    if (Date.now() - started > 200000) break;
-  } while (offset);
+  // Runs after the pushes below, so local edits reach Airtable first
+  // and the pull then brings back whatever Airtable made of them.
+  const doPull = async () => {
+      let offset: string | undefined;
+    do {
+      const p = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
+      if (offset) p.set("offset", offset);
+      const j = await at(cfg.base + "/" + cfg.table + "?" + p.toString());
+      const recs = j.records || [];
+      await upsertMany(key, recs, modifiedField);
+      pulled += recs.length;
+      offset = j.offset;
+      if (Date.now() - started > 200000) break;
+    } while (offset);
+  };
+
 
   // Only fields Airtable will accept back.
   function fieldsFor(row: any) {
@@ -85,14 +91,24 @@ async function run(key: string) {
     `select * from mirror_rows where table_key=$1 and airtable_id is not null
        and (synced_at is null or updated_at > synced_at) order by id limit 100`, [key]);
   let pushedUpd = 0;
+  const problems: string[] = [];
   for (const group of chunk(toUpdate, 10)) {
     const recs = group.map((r: any) => ({ id: r.airtable_id, fields: fieldsFor(r) }));
-    try { await at(cfg.base + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ records: recs }) }); }
-    catch { await at(cfg.base + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ typecast: true, records: recs }) }); }
+    try {
+      try { await at(cfg.base + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ records: recs }) }); }
+      catch { await at(cfg.base + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ typecast: true, records: recs }) }); }
+    } catch (e: any) {
+      // One awkward record must not stop the rest of the board syncing.
+      problems.push(String(e.message).slice(0, 160));
+      await sleep(250);
+      continue;
+    }
     await q("update mirror_rows set synced_at=now() where id = any($1::bigint[])", [group.map((r: any) => r.id)]);
     pushedUpd += recs.length;
     await sleep(250);
   }
+
+  await doPull();
 
   const ms = Date.now() - started;
   await q("insert into sync_log (kind, pulled, pushed_new, pushed_upd, ms) values ($1,$2,$3,$4,$5)",
@@ -101,7 +117,7 @@ async function run(key: string) {
     await q("update client_boards set last_sync = now(), last_result = $2 where base_id = $1",
       [cfg.base, `${pulled} pulled, ${pushedNew} new, ${pushedUpd} updated`]);
   }
-  return { ok: true, pulled, pushed_new: pushedNew, pushed_upd: pushedUpd, ms };
+  return { ok: true, pulled, pushed_new: pushedNew, pushed_upd: pushedUpd, ms, problems: problems.slice(0, 3), not_sent: toUpdate.length - pushedUpd };
 }
 
 async function handle(req: Request, ctx: any) {
