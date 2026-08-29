@@ -22,7 +22,12 @@ export default function BoardDetail({ base }: { base: string }) {
       setBoard(j.board);
       setCaseName(j.board?.case_name || "");
       setTables(j.tables || []);
-      setPick((cur) => cur || (j.tables || []).find((t: Tbl) => t.rows > 0)?.id || (j.tables || [])[0]?.id || "");
+      let want = "";
+      try { want = new URLSearchParams(window.location.search).get("t") || ""; } catch {}
+      setPick((cur) => cur
+        || ((j.tables || []).some((t: Tbl) => t.id === want) ? want : "")
+        || (j.tables || []).find((t: Tbl) => t.rows > 0)?.id
+        || (j.tables || [])[0]?.id || "");
     } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
   }, [base]);
   useEffect(() => { load(); }, [load]);

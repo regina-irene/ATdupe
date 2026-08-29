@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { q, ensureSchema } from "../../../../lib/db";
 import { authorize } from "../../../../lib/auth";
-import { tablesIn } from "../../../../lib/mirror";
+import { tablesIn, baseName } from "../../../../lib/mirror";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +35,11 @@ export async function PATCH(req: Request, ctx: any) {
     await ensureSchema();
     const p = await ctx.params;
     const b = await req.json();
+    if (b.renameFromAirtable) {
+      const n = await baseName(p.base);
+      if (n) await q("update client_boards set label = $2 where base_id = $1", [p.base, n]);
+      return NextResponse.json({ ok: true, label: n });
+    }
     await q("update client_boards set label = coalesce($2, label), case_name = $3, note = $4 where base_id = $1",
       [p.base, b.label || null, b.case_name ?? null, b.note ?? null]);
     return NextResponse.json({ ok: true });

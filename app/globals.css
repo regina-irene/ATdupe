@@ -291,3 +291,8 @@ table.data th.money{text-align:right}
 .card[data-tone=board]{--tone:#4f46e5}
 :root[data-mode=dark] .card[data-tone=board]{--tone:#818cf8}
 .viewchip .x:disabled{opacity:.4;cursor:default}
+.twist{border:none;background:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 6px 0 0;line-height:1}
+.twist:hover{color:var(--accent)}
+table.data tr.grouprow td{background:var(--panel-2);font-size:12px;cursor:pointer;border-top:1px solid var(--line)}
+table.data tr.expandrow td{background:color-mix(in srgb,var(--tone,var(--accent)) 5%,var(--panel));padding:9px}
+a.chip{text-decoration:none;display:inline-block}

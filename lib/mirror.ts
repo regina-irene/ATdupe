@@ -18,6 +18,23 @@ export function resolve(key: string): { base: string; table: string; label: stri
   throw new Error("Unknown board: " + key);
 }
 
+// The base's own name in Airtable, e.g. "Boatman, Deja". Cached because the
+// list endpoint is paginated and rarely changes.
+export async function baseName(baseId: string): Promise<string | null> {
+  const cached = await getState("base_names");
+  let map: Record<string, string> = {};
+  try { map = cached ? JSON.parse(cached) : {}; } catch {}
+  if (map[baseId]) return map[baseId];
+  let offset: string | undefined;
+  do {
+    const j = await at("meta/bases" + (offset ? "?offset=" + offset : ""));
+    for (const b of j.bases || []) map[b.id] = b.name;
+    offset = j.offset;
+  } while (offset && !map[baseId]);
+  await setState("base_names", JSON.stringify(map));
+  return map[baseId] || null;
+}
+
 // Every table in a base, for building the sub-tabs of a client board.
 export async function tablesIn(baseId: string): Promise<{ id: string; name: string; count?: number }[]> {
   if (!/^app[A-Za-z0-9]{14}$/.test(baseId)) throw new Error("That does not look like an Airtable base id.");
