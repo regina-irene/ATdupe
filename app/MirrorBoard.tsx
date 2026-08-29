@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MultiSelect from "./MultiSelect";
 import Chip from "./Chip";
+import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
 type Cond = { fid: string; op: string; val: any };
@@ -58,6 +59,8 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const [naming, setNaming] = useState(false);
   const [viewName, setViewName] = useState("");
   const [boardMap, setBoardMap] = useState<Record<string, string>>({});
+  const [groupId, setGroupId] = useState("");
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState<any>({});
 
@@ -330,6 +333,27 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const closedField = fields.find((f) => f.type === "checkbox" && f.name.trim().toLowerCase() === "closed");
   const closedPick = closedField ? String(conds.find((c) => c.fid === closedField.id)?.val ?? "") : "";
 
+  // Anything worth grouping by: selects, ticks, dates and plain text.
+  const GROUPABLE = ["singleSelect", "multipleSelects", "checkbox", "singleLineText",
+    "date", "dateTime", "lastModifiedTime", "createdTime", "formula", "multipleLookupValues"];
+  const GROUPS: GroupDef[] = fields
+    .filter((f) => GROUPABLE.indexOf(f.type) >= 0)
+    .map((f) => ({
+      id: f.id,
+      label: f.name,
+      keyOf: (r: any) => {
+        const v = r.data?.[f.id];
+        if (f.type === "checkbox") return v ? "Yes" : "No";
+        if (f.type === "date" || f.type === "dateTime" || f.type === "lastModifiedTime" || f.type === "createdTime")
+          return String(v ?? "").slice(0, 7);
+        if (Array.isArray(v)) return v.map((x: any) => (x && typeof x === "object" ? x.name : x)).join(", ");
+        if (v && typeof v === "object") return String(v.name ?? "");
+        return String(v ?? "");
+      },
+    }));
+  const groupDef = GROUPS.find((g) => g.id === groupId) || null;
+  const groups = buildGroups(rows, groupDef);
+
   const cols = shown.map((id) => byId.get(id)!).filter(Boolean);
   const linksBoards = boardKey === "status";
   const span = cols.length + 1 + (linksBoards ? 1 : 0);
@@ -474,6 +498,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                 </div>
               ) : null}
             </div>
+            <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
@@ -501,7 +526,13 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
             <tbody>
               {loading ? (<tr><td colSpan={span} className="muted">Loading...</td></tr>)
                 : rows.length === 0 ? (<tr><td colSpan={span} className="muted">Nothing matches. If this board is empty, press Sync Airtable.</td></tr>)
-                : rows.map((r) => editing === r.id ? (
+: groups.map((g) => (
+                <Fragment key={"g" + g.key}>
+                  {groupDef ? (
+                    <GroupRow label={g.key} count={g.items.length} span={span}
+                      collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
+                  ) : null}
+                  {folded[g.key] ? null : g.items.map((r) => editing === r.id ? (
                 <tr key={r.id}><td colSpan={span}>
                   <div className="grid g4">
                     {editable.map((f) => (
@@ -530,6 +561,8 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                     <button className="btn ghost sm" onClick={() => { setEditing(r.id); setDraft({ ...(r.data || {}) }); }}>Edit</button>
                   </td>
                 </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

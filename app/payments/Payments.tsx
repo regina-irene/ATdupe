@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MultiSelect from "../MultiSelect";
 import Chip, { useChoices } from "../Chip";
+import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { CF } from "../../lib/constants";
 
 const money = (v: any) =>
@@ -75,6 +76,8 @@ export default function Payments() {
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
   const choices = useChoices();
+  const [groupId, setGroupId] = useState("");
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     try {
@@ -173,6 +176,18 @@ export default function Payments() {
     } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
     setSyncing(false);
   }
+
+  const GROUPS: GroupDef[] = [
+    { id: "case", label: "Case", keyOf: (p) => p.case_name || "" },
+    { id: "kind", label: "Type of payment", keyOf: (p) => p.kind || "" },
+    { id: "method", label: "Payment method", keyOf: (p) => p.method || "" },
+    { id: "type", label: "Case type", keyOf: (p) => p.case_type || "" },
+    { id: "cleared", label: "Cleared?", keyOf: (p) => p.cleared || "" },
+    { id: "year", label: "Year", keyOf: (p) => String(p.year ?? "") },
+    { id: "month", label: "Month", keyOf: (p) => String(p.pay_date || "").slice(0, 7) },
+  ];
+  const groupDef = GROUPS.find((g) => g.id === groupId) || null;
+  const groups = buildGroups(rows, groupDef);
 
   const pages = Math.max(1, Math.ceil(tot.total / pageSize));
   const cols = order.map((id) => COLUMNS.find((c) => c.id === id)!).filter(Boolean);
@@ -288,6 +303,7 @@ export default function Payments() {
           </div>
           <div className="spacer" />
           <div className="row noprint">
+            <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <span className="muted small">Click a heading to sort. Drag to move.</span>
             <button className="btn sm" onClick={() => persist(DEFAULT_ORDER)}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
@@ -317,7 +333,13 @@ export default function Payments() {
             <tbody>
               {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
                 : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">No payments match these filters.</td></tr>)
-                : rows.map((p) => editing === p.id ? (
+: groups.map((g) => (
+                <Fragment key={"g" + g.key}>
+                  {groupDef ? (
+                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 1} extra={money(g.items.reduce((n: number, x: any) => n + Number(x.amount || 0), 0))}
+                      collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
+                  ) : null}
+                  {folded[g.key] ? null : g.items.map((p) => editing === p.id ? (
                 <tr key={p.id}><td colSpan={cols.length + 1}>
                   <div className="grid g4">
                     <div><label className="f">Payment date</label><input type="date" value={draft.pay_date || ""} onChange={(e) => setDraft({ ...draft, pay_date: e.target.value })} /></div>
@@ -370,6 +392,8 @@ export default function Payments() {
                     }}>Edit</button>
                   </td>
                 </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

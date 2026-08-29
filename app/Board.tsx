@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FIRMS, KINDS, QUICK_HOURS, CF } from "../lib/constants";
 import Chip, { useChoices } from "./Chip";
+import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 
 function today() {
   const d = new Date();
@@ -34,7 +35,7 @@ function CaseCombo({ value, onChange }: { value: string; onChange: (v: string) =
         if (live) setOpts(j.cases || []);
       } catch {}
     }, 180);
-    return () => { live = false; clearTimeout(t); };
+  return () => { live = false; clearTimeout(t); };
   }, [value]);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
@@ -65,6 +66,8 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
   const choices = useChoices();
+  const [groupId, setGroupId] = useState("");
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
   const [polishing, setPolishing] = useState(false);
   const [draftText, setDraftText] = useState<string | null>(null);
 
@@ -203,6 +206,17 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
+  const GROUPS: GroupDef[] = [
+    { id: "case", label: "Case", keyOf: (r) => r.case_name || "" },
+    { id: "who", label: "Who", keyOf: (r) => r.user_name || "" },
+    { id: "kind", label: "Type", keyOf: (r) => r.kind || "" },
+    { id: "firm", label: "Firm", keyOf: (r) => r.firm || "" },
+    { id: "date", label: "Date", keyOf: (r) => d10(r.entry_date) },
+    { id: "month", label: "Month", keyOf: (r) => d10(r.entry_date).slice(0, 7) },
+  ];
+  const groupDef = GROUPS.find((g) => g.id === groupId) || null;
+  const groups = buildGroups(rows, groupDef);
+
   return (
     <div className="wrap">
       {msg ? <div className={"notice " + msg.kind}>{msg.text}</div> : null}
@@ -290,6 +304,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
               <option value={50}>50 / page</option><option value={200}>200 / page</option><option value={1000}>1000 / page</option>
             </select>
             <a className="btn sm" href={"/api/entries/export?" + filterQS}>Excel / CSV</a>
+            <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
@@ -308,7 +323,13 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
             <tbody>
               {loading ? (<tr><td colSpan={7} className="muted">Loading...</td></tr>)
                 : rows.length === 0 ? (<tr><td colSpan={7} className="muted">No entries match these filters.</td></tr>)
-                : rows.map((r) => editing === r.id ? (
+: groups.map((g) => (
+                <Fragment key={"g" + g.key}>
+                  {groupDef ? (
+                    <GroupRow label={g.key} count={g.items.length} span={7} extra={g.items.reduce((n: number, x: any) => n + Number(x.duration || 0), 0).toFixed(2) + " hrs"}
+                      collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
+                  ) : null}
+                  {folded[g.key] ? null : g.items.map((r) => editing === r.id ? (
                 <tr key={r.id}><td colSpan={7}>
                   <div className="grid g4">
                     <div><label className="f">Date</label><input type="date" value={draft.entry_date || ""} onChange={(e) => setDraft({ ...draft, entry_date: e.target.value })} /></div>
@@ -338,6 +359,8 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
                   <td><Chip v={r.kind} colors={choices[CF.timeKind]} dash={false} /></td>
                   <td className="noprint"><button className="btn ghost sm" onClick={() => { setEditing(r.id); setDraft({ entry_date: d10(r.entry_date), case_name: r.case_name, time_entry: r.time_entry, duration: r.duration, kind: r.kind, firm: r.firm, user_name: r.user_name }); }}>Edit</button></td>
                 </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

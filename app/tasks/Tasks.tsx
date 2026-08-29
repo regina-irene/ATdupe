@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_USERS, prioClass } from "../../lib/constants";
 import MultiSelect from "../MultiSelect";
 import Chip, { useChoices } from "../Chip";
+import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { CF } from "../../lib/constants";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
@@ -94,6 +95,8 @@ export default function Tasks() {
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
   const choices = useChoices();
+  const [groupId, setGroupId] = useState("");
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
 
   // Restore the saved column layout, dropping anything unrecognised and
   // appending any column added since the layout was saved.
@@ -234,6 +237,17 @@ export default function Tasks() {
     setSyncing(false);
   }
 
+  const GROUPS: GroupDef[] = [
+    { id: "case", label: "Case", keyOf: (t) => t.case_name || t.client_name || "" },
+    { id: "status", label: "Status", keyOf: (t) => t.status || "" },
+    { id: "priority", label: "Priority", keyOf: (t) => t.priority || "" },
+    { id: "who", label: "Who", keyOf: (t) => t.who || "" },
+    { id: "due", label: "Due month", keyOf: (t) => d10(t.due_date).slice(0, 7) },
+    { id: "state", label: "Open or closed", keyOf: (t) => (t.closed ? "Closed" : "Open") },
+  ];
+  const groupDef = GROUPS.find((g) => g.id === groupId) || null;
+  const groups = buildGroups(rows, groupDef);
+
   const today = todayStr();
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const cols = order.map((id) => COLUMNS.find((c) => c.id === id)!).filter(Boolean);
@@ -328,6 +342,7 @@ export default function Tasks() {
           <div className="stats"><div className="stat"><b>{total.toLocaleString()}</b><span>{showClosed ? "Tasks" : "Open tasks"}</span></div></div>
           <div className="spacer" />
           <div className="row noprint">
+            <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <span className="muted small">Click a heading to sort. Drag a heading to move the column.</span>
             <button className="btn sm" onClick={resetColumns}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
@@ -358,7 +373,13 @@ export default function Tasks() {
             <tbody>
               {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
                 : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">No tasks match these filters.</td></tr>)
-                : rows.map((t) => editing === t.id ? (
+: groups.map((g) => (
+                <Fragment key={"g" + g.key}>
+                  {groupDef ? (
+                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 1}
+                      collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
+                  ) : null}
+                  {folded[g.key] ? null : g.items.map((t) => editing === t.id ? (
                 <tr key={t.id}><td colSpan={cols.length + 1}>
                   <div className="grid g4">
                     <div><label className="f">Status</label>
@@ -396,6 +417,8 @@ export default function Tasks() {
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>
                   </td>
                 </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
