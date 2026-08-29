@@ -298,3 +298,4 @@ table.data tr.expandrow td{background:color-mix(in srgb,var(--tone,var(--accent)
 a.chip{text-decoration:none;display:inline-block}
 .groupextra{float:right;color:var(--muted);font-size:11.5px;font-weight:700}
 table.data tr.grouprow td{position:relative}
+.hot{color:var(--warn)}

@@ -4,6 +4,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 type Board = {
   id: number; base_id: string; label: string; case_name: string | null; note: string | null;
   last_sync: string | null; last_result: string | null; rows: number; added_at: string;
+  tables?: number; open_items?: number | null; files?: number | null;
+  last_activity?: string | null; update_text?: string | null; update_at?: string | null;
 };
 type Tbl = { id: string; name: string; rows: number };
 
@@ -16,16 +18,21 @@ const when = (v: any) => {
 };
 
 const COLUMNS: { id: string; label: string; width?: number }[] = [
-  { id: "label", label: "Board" },
-  { id: "case_name", label: "Case", width: 220 },
-  { id: "rows", label: "Rows", width: 90 },
-  { id: "last_sync", label: "Last sync", width: 150 },
-  { id: "last_result", label: "Result", width: 190 },
-  { id: "note", label: "Note", width: 190 },
-  { id: "base_id", label: "Base id", width: 160 },
-  { id: "added_at", label: "Added", width: 150 },
+  { id: "label", label: "Board", width: 210 },
+  { id: "case_name", label: "Case", width: 190 },
+  { id: "update_text", label: "Latest client update" },
+  { id: "open_items", label: "Open items", width: 96 },
+  { id: "files", label: "Files", width: 78 },
+  { id: "tables", label: "Tables", width: 82 },
+  { id: "rows", label: "Rows", width: 84 },
+  { id: "last_activity", label: "Last activity", width: 132 },
+  { id: "last_sync", label: "Last sync", width: 132 },
+  { id: "last_result", label: "Sync result", width: 180 },
+  { id: "note", label: "Note", width: 170 },
+  { id: "base_id", label: "Base id", width: 155 },
+  { id: "added_at", label: "Added", width: 132 },
 ];
-const DEFAULT_COLS = ["label", "case_name", "rows", "last_sync"];
+const DEFAULT_COLS = ["label", "case_name", "update_text", "open_items", "files", "last_activity"];
 const LAYOUT = "efl.boards.columns";
 
 const GROUPS: { id: string; label: string }[] = [
@@ -33,6 +40,7 @@ const GROUPS: { id: string; label: string }[] = [
   { id: "case", label: "Group by case" },
   { id: "letter", label: "Group by first letter" },
   { id: "state", label: "Group by sync state" },
+  { id: "activity", label: "Group by activity" },
 ];
 
 export default function Boards() {
@@ -193,9 +201,13 @@ export default function Boards() {
     const list = t ? rows.filter((b) =>
       [b.label, b.case_name, b.note, b.base_id].some((v) => String(v || "").toLowerCase().indexOf(t) >= 0)) : rows;
     const val = (b: Board) => String((b as any)[sort] ?? "").toLowerCase();
+    const NUM = ["rows", "tables", "open_items", "files"];
     return [...list].sort((a, b) => {
-      if (sort === "rows") return (dir === "asc" ? 1 : -1) * (a.rows - b.rows);
-      return (dir === "asc" ? 1 : -1) * val(a).localeCompare(val(b));
+      const s = dir === "asc" ? 1 : -1;
+      if (NUM.indexOf(sort) >= 0) return s * ((Number((a as any)[sort]) || 0) - (Number((b as any)[sort]) || 0));
+      if (sort === "last_activity" || sort === "last_sync" || sort === "added_at")
+        return s * (new Date((a as any)[sort] || 0).getTime() - new Date((b as any)[sort] || 0).getTime());
+      return s * val(a).localeCompare(val(b));
     });
   }, [rows, q, sort, dir]);
 
@@ -205,6 +217,11 @@ export default function Boards() {
     for (const b of filtered) {
       const k = group === "case" ? (b.case_name || "Not linked to a case")
         : group === "letter" ? (b.label?.[0] || "?").toUpperCase()
+        : group === "activity" ? (() => {
+            if (!b.last_activity) return "No activity";
+            const days = (Date.now() - new Date(b.last_activity).getTime()) / 86400000;
+            return days < 7 ? "This week" : days < 30 ? "This month" : days < 90 ? "Last 3 months" : "Older";
+          })()
         : b.last_sync ? "Synced" : "Never synced";
       map.set(k, [...(map.get(k) || []), b]);
     }
@@ -233,6 +250,18 @@ export default function Boards() {
         ? <a href={"/cases?q=" + encodeURIComponent(b.case_name)}>{b.case_name}</a>
         : <span className="muted">not linked</span>}</td>;
       case "rows": return <td key={id} className="money">{b.rows.toLocaleString()}</td>;
+      case "tables": return <td key={id} className="money">{b.tables ? b.tables : <span className="muted">-</span>}</td>;
+      case "open_items": return <td key={id} className="money">
+        {b.open_items === null || b.open_items === undefined ? <span className="muted">-</span>
+          : b.open_items === 0 ? <span className="muted">0</span>
+          : <b className={b.open_items > 9 ? "hot" : ""}>{b.open_items}</b>}</td>;
+      case "files": return <td key={id} className="money">{b.files ? b.files.toLocaleString() : <span className="muted">-</span>}</td>;
+      case "last_activity": return <td key={id} className="date small">{b.last_activity ? when(b.last_activity) : <span className="muted">-</span>}</td>;
+      case "update_text": return <td key={id} className="small">
+        {b.update_text
+          ? <span title={b.update_text}>{b.update_text.length > 150 ? b.update_text.slice(0, 150) + "..." : b.update_text}
+              {b.update_at ? <span className="muted"> · {when(b.update_at)}</span> : null}</span>
+          : <span className="muted">{b.rows ? "no client update" : "not synced yet"}</span>}</td>;
       case "last_sync": return <td key={id} className="date small">{b.last_sync ? when(b.last_sync) : <span className="muted">never</span>}</td>;
       case "last_result": return <td key={id} className="small muted">{b.last_result || ""}</td>;
       case "note": return <td key={id} className="small muted">{b.note || ""}</td>;
@@ -275,8 +304,13 @@ export default function Boards() {
 
       <div className="card" data-tone="board">
         <div className="row" style={{ marginBottom: 9 }}>
-          <div className="stats"><div className="stat"><b>{rows.length}</b><span>Boards</span></div>
-            <div className="stat"><b>{rows.reduce((n, b) => n + b.rows, 0).toLocaleString()}</b><span>Rows</span></div></div>
+          <div className="stats">
+            <div className="stat"><b>{rows.length}</b><span>Boards</span></div>
+            <div className="stat"><b>{rows.reduce((n, b) => n + (b.open_items || 0), 0).toLocaleString()}</b><span>Open items</span></div>
+            <div className="stat"><b>{rows.reduce((n, b) => n + (b.files || 0), 0).toLocaleString()}</b><span>Files</span></div>
+            <div className="stat"><b>{rows.reduce((n, b) => n + b.rows, 0).toLocaleString()}</b><span>Rows</span></div>
+            <div className="stat"><b>{rows.filter((b) => !b.last_sync).length}</b><span>Never synced</span></div>
+          </div>
           <div className="spacer" />
           <div className="row noprint">
             <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a board" style={{ width: 150 }} />
