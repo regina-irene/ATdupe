@@ -91,6 +91,19 @@ export default function Boards() {
     fetch("/api/cases?limit=1000").then((r) => r.json()).then((j) => setCases(j.cases || [])).catch(() => {});
   }, []);
 
+  async function importFromClients() {
+    setBusy("import");
+    try {
+      const j = await (await fetch("/api/client-boards/import", { method: "POST" })).json();
+      if (j.error) throw new Error(j.error);
+      const bits = [`Read ${j.seen} clients`, `${j.added} added`, `${j.updated} renamed`];
+      if (j.no_base) bits.push(`${j.no_base} without a base id`);
+      setMsg({ kind: "ok", text: bits.join(", ") + "." });
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setBusy("");
+  }
+
   async function add() {
     if (!form.url.trim()) { setMsg({ kind: "err", text: "Paste one or more Airtable links." }); return; }
     setBusy("add");
@@ -252,8 +265,11 @@ export default function Boards() {
         </div>
         <div className="row" style={{ marginTop: 9 }}>
           <button className="btn primary sm" disabled={!!busy} onClick={add}>{busy === "add" ? "Checking access..." : "Add"}</button>
+          <button className="btn sm" disabled={!!busy} onClick={importFromClients}>
+            {busy === "import" ? "Reading Clients..." : "Import from Clients tab"}
+          </button>
           <div className="spacer" />
-          <span className="muted small">Each board is named from Airtable. Nothing is copied until you sync.</span>
+          <span className="muted small">Import names every board from the Clients table and links it to its case.</span>
         </div>
       </div>
 

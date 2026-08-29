@@ -33,6 +33,16 @@ export const PF = {
   modified: "fld3HD2feyJlK1ELf",
 };
 
+// Clients table fields, used to build the client board list.
+export const CLIENT_TABLE = process.env.AIRTABLE_CLIENT_TABLE_ID || "tblPPcVwWJ3IjBRLu";
+export const CLF = {
+  name: "fldCvO6UpdJ4uzu7x",
+  baseId: "fldRzf48b0Zc5pXrF",
+  statusLink: "fldapMLsbiMB7hcOr",
+  statusLink2: "fldGl23e1sHDttzsh",
+  archived: "fldkGaY1aWC9KmKnm",
+};
+
 function token(): string {
   const t = process.env.AIRTABLE_TOKEN;
   if (!t) throw new Error("AIRTABLE_TOKEN is not set");

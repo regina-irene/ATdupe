@@ -5,6 +5,7 @@ import Chip from "./Chip";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
 type Cond = { fid: string; op: string; val: any };
+type View = { id: number; name: string; owner?: string; params: any };
 type Row = { id: number; airtable_id: string | null; data: any; at_modified: string | null; updated_at: string; source: string };
 
 const TEXTY = ["singleLineText", "multilineText", "richText", "email", "url", "phoneNumber", "barcode"];
@@ -53,6 +54,9 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
 
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState<any>({});
+  const [views, setViews] = useState<View[]>([]);
+  const [naming, setNaming] = useState(false);
+  const [viewName, setViewName] = useState("");
   const [boardMap, setBoardMap] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState<any>({});
@@ -143,6 +147,47 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
     p.set("pageSize", String(pageSize));
     return p.toString();
   }, [q, conds, sort, dir, page]);
+
+  const viewPage = "mirror:" + boardKey;
+  const loadViews = useCallback(() => {
+    fetch("/api/views?page=" + encodeURIComponent(viewPage))
+      .then((r) => r.json()).then((j) => { if (!j.error) setViews(j.rows || []); }).catch(() => {});
+  }, [viewPage]);
+  useEffect(() => { loadViews(); }, [loadViews]);
+
+  const current = useMemo(() => ({ q, conds, sort, dir }), [q, conds, sort, dir]);
+  const isBlank = q === "" && conds.length === 0 && sort === "";
+  function sameAs(params: any) {
+    return JSON.stringify({ q: params?.q ?? "", conds: params?.conds ?? [], sort: params?.sort ?? "", dir: params?.dir ?? "asc" })
+      === JSON.stringify(current);
+  }
+  function applyView(params: any) {
+    setQ(params?.q ?? "");
+    setConds(Array.isArray(params?.conds) ? params.conds : []);
+    setSort(params?.sort ?? "");
+    setDir(params?.dir ?? "asc");
+    setPage(1);
+  }
+  async function saveView() {
+    const name = viewName.trim();
+    if (!name) return;
+    const dupe = views.find((v) => v.name.toLowerCase() === name.toLowerCase());
+    if (dupe && !confirm('A view called "' + dupe.name + '" already exists. Replace it?')) return;
+    const j = await (await fetch("/api/views", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ page: viewPage, name, params: current }),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setNaming(false); setViewName("");
+    setMsg({ kind: "ok", text: 'Saved the view "' + name + '".' });
+    loadViews();
+  }
+  async function deleteView(v: View) {
+    if (!confirm('Delete the saved view "' + v.name + '"?')) return;
+    const j = await (await fetch("/api/views/" + v.id, { method: "DELETE" })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    loadViews();
+  }
 
   const load = useCallback(async () => {
     if (!fields.length) return;
@@ -295,6 +340,36 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   return (
     <div className="wrap">
       {msg ? <div className={"notice " + msg.kind}>{msg.text}</div> : null}
+
+      <div className="card noprint" data-tone="case">
+        <h2>Saved views</h2>
+        <div className="row">
+          <div className="chips nowrap" style={{ marginTop: 0 }}>
+            <button className={"chip " + (isBlank ? "on" : "")} onClick={() => applyView({})}>Everything</button>
+            {views.map((v) => (
+              <span key={v.id} className="viewchip">
+                <button className={"chip " + (sameAs(v.params) ? "on" : "")} title={v.owner ? "Saved by " + v.owner : ""}
+                  onClick={() => applyView(v.params)}>{v.name}</button>
+                <button className="x" title={"Delete " + v.name} onClick={() => deleteView(v)}>&times;</button>
+              </span>
+            ))}
+            {views.length === 0 ? <span className="muted small">Set filters below, then save them here as a button.</span> : null}
+          </div>
+          <div className="spacer" />
+          {naming ? (
+            <div className="row">
+              <input type="text" autoFocus value={viewName} maxLength={40} placeholder="e.g. Open in Gwinnett"
+                onChange={(e) => setViewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveView(); if (e.key === "Escape") { setNaming(false); setViewName(""); } }}
+                style={{ width: 180 }} />
+              <button className="btn primary sm" onClick={saveView}>Save</button>
+              <button className="btn ghost sm" onClick={() => { setNaming(false); setViewName(""); }}>Cancel</button>
+            </div>
+          ) : (
+            <button className="btn sm" onClick={() => setNaming(true)}>Save these filters</button>
+          )}
+        </div>
+      </div>
 
       <div className="card noprint" data-tone="case">
         <div className="row">
