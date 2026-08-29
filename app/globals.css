@@ -13,6 +13,7 @@
 :root[data-page=payments]{--page:#047857}
 :root[data-page=cases]{--page:#c2410c}
 :root[data-page=clients]{--page:#a21caf}
+:root[data-page=boards]{--page:#4f46e5}
 :root[data-page=setup]{--page:#0f766e}
 :root[data-mode=dark]{--bg:#0b1017;--panel:#141b25;--panel-2:#18202b;--ink:#e8eef7;--muted:#94a3b8;--line:#252f3d;--danger:#fb7185;--warn:#fbbf24;--good:#34d399;--sh:0 1px 2px rgba(0,0,0,.4);--sh-lg:0 10px 30px -10px rgba(0,0,0,.7)}
 :root[data-mode=dark][data-page=board]{--page:#60a5fa}
@@ -22,6 +23,7 @@
 :root[data-mode=dark][data-page=payments]{--page:#34d399}
 :root[data-mode=dark][data-page=cases]{--page:#fb923c}
 :root[data-mode=dark][data-page=clients]{--page:#e879f9}
+:root[data-mode=dark][data-page=boards]{--page:#818cf8}
 :root[data-mode=dark][data-page=setup]{--page:#2dd4bf}
 :root[data-density=compact]{--pad:9px;--gap:7px;--ctl:4px 8px}
 :root[data-density=roomy]{--pad:16px;--gap:13px;--ctl:8px 11px}
@@ -286,3 +288,6 @@ table.data th.money{text-align:right}
 .topbar nav::-webkit-scrollbar{display:none}
 .filterrow{align-items:flex-end;gap:7px;margin-top:7px;padding:7px;border:1px solid var(--line);border-radius:var(--rs);background:var(--panel-2)}
 .ms .mspanel .msitem{cursor:pointer}
+.card[data-tone=board]{--tone:#4f46e5}
+:root[data-mode=dark] .card[data-tone=board]{--tone:#818cf8}
+.viewchip .x:disabled{opacity:.4;cursor:default}

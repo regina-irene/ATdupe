@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { q, ensureSchema } from "../../../../lib/db";
 import { authorize } from "../../../../lib/auth";
-import { MIRRORS, schemaFor, isNumber } from "../../../../lib/mirror";
+import { resolve, schemaFor, isNumber } from "../../../../lib/mirror";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function GET(req: Request, ctx: any) {
   try {
     await ensureSchema();
     const p = await ctx.params;
-    if (!MIRRORS[p.key]) return NextResponse.json({ error: "Unknown board" }, { status: 404 });
+    resolve(p.key);
     const { fields } = await schemaFor(p.key);
     const byId = new Map(fields.map((f) => [f.id, f] as const));
 
@@ -103,7 +103,7 @@ export async function POST(req: Request, ctx: any) {
   try {
     await ensureSchema();
     const p = await ctx.params;
-    if (!MIRRORS[p.key]) return NextResponse.json({ error: "Unknown board" }, { status: 404 });
+    resolve(p.key);
     const { fields, primary } = await schemaFor(p.key);
     const writable = new Set(fields.filter((f) => f.writable).map((f) => f.id));
     const b = await req.json();

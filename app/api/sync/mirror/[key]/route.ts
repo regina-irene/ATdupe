@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { db, q, ensureSchema } from "../../../../../lib/db";
 import { authorize } from "../../../../../lib/auth";
-import { at, chunk, sleep, BASE } from "../../../../../lib/airtable";
-import { MIRRORS, schemaFor, coerce } from "../../../../../lib/mirror";
+import { at, chunk, sleep } from "../../../../../lib/airtable";
+import { resolve, schemaFor, coerce } from "../../../../../lib/mirror";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,8 +33,7 @@ async function upsertMany(key: string, recs: any[], modifiedField: string | null
 }
 
 async function run(key: string) {
-  const cfg = MIRRORS[key];
-  if (!cfg) throw new Error("Unknown board: " + key);
+  const cfg = resolve(key);
   await ensureSchema();
   const started = Date.now();
   const { fields } = await schemaFor(key);
@@ -46,7 +45,7 @@ async function run(key: string) {
   do {
     const p = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
     if (offset) p.set("offset", offset);
-    const j = await at(BASE + "/" + cfg.table + "?" + p.toString());
+    const j = await at(cfg.base + "/" + cfg.table + "?" + p.toString());
     const recs = j.records || [];
     await upsertMany(key, recs, modifiedField);
     pulled += recs.length;
@@ -73,8 +72,8 @@ async function run(key: string) {
   for (const group of chunk(toCreate, 10)) {
     const body = { records: group.map((r: any) => ({ fields: fieldsFor(r) })) };
     let res: any;
-    try { res = await at(BASE + "/" + cfg.table, { method: "POST", body: JSON.stringify(body) }); }
-    catch { res = await at(BASE + "/" + cfg.table, { method: "POST", body: JSON.stringify({ ...body, typecast: true }) }); }
+    try { res = await at(cfg.base + "/" + cfg.table, { method: "POST", body: JSON.stringify(body) }); }
+    catch { res = await at(cfg.base + "/" + cfg.table, { method: "POST", body: JSON.stringify({ ...body, typecast: true }) }); }
     for (let i = 0; i < res.records.length; i++) {
       await q("update mirror_rows set airtable_id=$1, synced_at=now() where id=$2", [res.records[i].id, group[i].id]);
       pushedNew++;
@@ -88,8 +87,8 @@ async function run(key: string) {
   let pushedUpd = 0;
   for (const group of chunk(toUpdate, 10)) {
     const recs = group.map((r: any) => ({ id: r.airtable_id, fields: fieldsFor(r) }));
-    try { await at(BASE + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ records: recs }) }); }
-    catch { await at(BASE + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ typecast: true, records: recs }) }); }
+    try { await at(cfg.base + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ records: recs }) }); }
+    catch { await at(cfg.base + "/" + cfg.table, { method: "PATCH", body: JSON.stringify({ typecast: true, records: recs }) }); }
     await q("update mirror_rows set synced_at=now() where id = any($1::bigint[])", [group.map((r: any) => r.id)]);
     pushedUpd += recs.length;
     await sleep(250);
@@ -98,6 +97,10 @@ async function run(key: string) {
   const ms = Date.now() - started;
   await q("insert into sync_log (kind, pulled, pushed_new, pushed_upd, ms) values ($1,$2,$3,$4,$5)",
     ["mirror:" + key, pulled, pushedNew, pushedUpd, ms]);
+  if (key.startsWith("b:")) {
+    await q("update client_boards set last_sync = now(), last_result = $2 where base_id = $1",
+      [cfg.base, `${pulled} pulled, ${pushedNew} new, ${pushedUpd} updated`]);
+  }
   return { ok: true, pulled, pushed_new: pushedNew, pushed_upd: pushedUpd, ms };
 }
 

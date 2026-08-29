@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { q, ensureSchema } from "../../../../../lib/db";
 import { authorize } from "../../../../../lib/auth";
-import { MIRRORS, schemaFor } from "../../../../../lib/mirror";
+import { resolve, schemaFor } from "../../../../../lib/mirror";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function PATCH(req: Request, ctx: any) {
   try {
     await ensureSchema();
     const p = await ctx.params;
-    if (!MIRRORS[p.key]) return NextResponse.json({ error: "Unknown board" }, { status: 404 });
+    resolve(p.key);
     const { fields } = await schemaFor(p.key);
     const writable = new Set(fields.filter((f) => f.writable).map((f) => f.id));
     const b = await req.json();

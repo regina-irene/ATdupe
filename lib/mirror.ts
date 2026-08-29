@@ -8,6 +8,23 @@ export const MIRRORS: Record<string, { table: string; label: string; singular: s
   clients: { table: process.env.AIRTABLE_CLIENT_TABLE_ID || "tblPPcVwWJ3IjBRLu", label: "Clients", singular: "client" },
 };
 
+// A board key is either one of MIRRORS above, or "b:<baseId>:<tableId>" for a
+// table in any other base (the per-matter client boards).
+export function resolve(key: string): { base: string; table: string; label: string; singular: string } {
+  const fixed = MIRRORS[key];
+  if (fixed) return { base: BASE, table: fixed.table, label: fixed.label, singular: fixed.singular };
+  const m = /^b:(app[A-Za-z0-9]{14}):(tbl[A-Za-z0-9]{14})$/.exec(key);
+  if (m) return { base: m[1], table: m[2], label: "", singular: "record" };
+  throw new Error("Unknown board: " + key);
+}
+
+// Every table in a base, for building the sub-tabs of a client board.
+export async function tablesIn(baseId: string): Promise<{ id: string; name: string; count?: number }[]> {
+  if (!/^app[A-Za-z0-9]{14}$/.test(baseId)) throw new Error("That does not look like an Airtable base id.");
+  const meta = await at("meta/bases/" + baseId + "/tables");
+  return (meta.tables || []).map((t: any) => ({ id: t.id, name: t.name }));
+}
+
 export type Field = {
   id: string; name: string; type: string;
   writable: boolean;
@@ -40,17 +57,16 @@ export function isNumber(t: string) {
 const KEY = (k: string) => "mirror_schema_" + k;
 const AGE = 6 * 60 * 60 * 1000;
 
-export async function schemaFor(key: string, force = false): Promise<{ fields: Field[]; primary: string }> {
-  const cfg = MIRRORS[key];
-  if (!cfg) throw new Error("Unknown board: " + key);
+export async function schemaFor(key: string, force = false): Promise<{ fields: Field[]; primary: string; label: string; singular: string }> {
+  const cfg = resolve(key);
   const cached = await getState(KEY(key));
   if (!force && cached) {
     const j = JSON.parse(cached);
-    if (Date.now() - (j.at || 0) < AGE) return { fields: j.fields, primary: j.primary };
+    if (Date.now() - (j.at || 0) < AGE) return { fields: j.fields, primary: j.primary, label: j.label, singular: j.singular };
   }
-  const meta = await at("meta/bases/" + BASE + "/tables");
+  const meta = await at("meta/bases/" + cfg.base + "/tables");
   const t = (meta.tables || []).find((x: any) => x.id === cfg.table);
-  if (!t) throw new Error("Table " + cfg.table + " is not in this base, or the token cannot read the schema.");
+  if (!t) throw new Error("Table " + cfg.table + " is not in base " + cfg.base + ", or the token cannot read that base's schema.");
   const fields: Field[] = (t.fields || []).map((f: any) => ({
     id: f.id,
     name: f.name,
@@ -59,9 +75,11 @@ export async function schemaFor(key: string, force = false): Promise<{ fields: F
     choices: (f.options?.choices || []).map((c: any) => ({ name: c.name, color: c.color || "" })),
     linked: f.options?.linkedTableId,
   }));
+  const label = cfg.label || t.name;
+  const singular = cfg.singular === "record" ? "record" : cfg.singular;
   const primary = t.primaryFieldId;
-  await setState(KEY(key), JSON.stringify({ at: Date.now(), fields, primary }));
-  return { fields, primary };
+  await setState(KEY(key), JSON.stringify({ at: Date.now(), fields, primary, label, singular }));
+  return { fields, primary, label, singular };
 }
 
 // Turn a value from the board into what Airtable expects for that field type.

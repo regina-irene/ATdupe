@@ -53,12 +53,31 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
 
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState<any>({});
+  const [boardMap, setBoardMap] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState<any>({});
 
   const LAYOUT = "efl.mirror." + boardKey + ".columns";
   const byId = useMemo(() => new Map(fields.map((f) => [f.id, f] as const)), [fields]);
   const colorsFor = (f: Field) => Object.fromEntries((f.choices || []).map((c) => [c.name, c.color]));
+
+  // Cases links out to the matching per-matter client board.
+  useEffect(() => {
+    if (boardKey !== "status") return;
+    fetch("/api/client-boards").then((r) => r.json()).then((j) => {
+      const m: Record<string, string> = {};
+      for (const b of j.rows || []) if (b.case_name) m[String(b.case_name).trim().toLowerCase()] = b.base_id;
+      setBoardMap(m);
+    }).catch(() => {});
+  }, [boardKey]);
+
+  // Arriving from a client board with ?q=<case name> pre-fills the search.
+  useEffect(() => {
+    try {
+      const v = new URLSearchParams(window.location.search).get("q");
+      if (v) setQ(v);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     fetch("/api/mirror/" + boardKey + "/schema").then((r) => r.json()).then((j) => {
@@ -267,6 +286,8 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const closedPick = closedField ? String(conds.find((c) => c.fid === closedField.id)?.val ?? "") : "";
 
   const cols = shown.map((id) => byId.get(id)!).filter(Boolean);
+  const linksBoards = boardKey === "status";
+  const span = cols.length + 1 + (linksBoards ? 1 : 0);
   const editable = fields.filter((f) => f.writable);
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const pickerList = term ? fields.filter((f) => f.name.toLowerCase().indexOf(term.toLowerCase()) >= 0) : fields;
@@ -399,13 +420,14 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                   <span className="caret">{sort === f.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
                 </th>
               ))}
+              {linksBoards ? <th className="noprint" style={{ width: 92 }}>Client board</th> : null}
               <th className="noprint" style={{ width: 62 }}></th>
             </tr></thead>
             <tbody>
-              {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
-                : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">Nothing matches. If this board is empty, press Sync Airtable.</td></tr>)
+              {loading ? (<tr><td colSpan={span} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={span} className="muted">Nothing matches. If this board is empty, press Sync Airtable.</td></tr>)
                 : rows.map((r) => editing === r.id ? (
-                <tr key={r.id}><td colSpan={cols.length + 1}>
+                <tr key={r.id}><td colSpan={span}>
                   <div className="grid g4">
                     {editable.map((f) => (
                       <div key={f.id}><label className="f">{f.name}</label>
@@ -422,6 +444,13 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
               ) : (
                 <tr key={r.id}>
                   {cols.map((f) => <td key={f.id} className="small">{show(f, r.data?.[f.id])}</td>)}
+                  {linksBoards ? (
+                    <td className="noprint">
+                      {boardMap[String(r.data?.[primary] ?? "").trim().toLowerCase()]
+                        ? <a className="btn ghost sm" href={"/boards/" + boardMap[String(r.data?.[primary] ?? "").trim().toLowerCase()]}>Open</a>
+                        : <span className="muted small">-</span>}
+                    </td>
+                  ) : null}
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(r.id); setDraft({ ...(r.data || {}) }); }}>Edit</button>
                   </td>
