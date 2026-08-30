@@ -33,11 +33,11 @@ async function upsertMany(key: string, recs: any[], modifiedField: string | null
   );
 }
 
-async function run(key: string) {
+async function run(key: string, fresh = false) {
   const cfg = resolve(key);
   await ensureSchema();
   const started = Date.now();
-  const { fields } = await schemaFor(key);
+  const { fields } = await schemaFor(key, fresh);
   const byId = new Map(fields.map((f) => [f.id, f] as const));
   const modifiedField = fields.find((f) => f.type === "lastModifiedTime")?.id || null;
 
@@ -125,7 +125,7 @@ async function handle(req: Request, ctx: any) {
   if (!isCron && !(await authorize(req))) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const p = await ctx.params;
   try {
-    return NextResponse.json(await run(p.key));
+    return NextResponse.json(await run(p.key, !isCron));
   } catch (e: any) {
     try { await q("insert into sync_log (kind, error) values ($1,$2)", ["mirror:" + p.key, String(e.message).slice(0, 500)]); } catch {}
     return NextResponse.json({ error: e.message }, { status: 500 });

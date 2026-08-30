@@ -87,6 +87,9 @@ async function backfill() {
     await setState("backfill_count", String(pulled));
   }
   await q("insert into sync_log (kind, pulled, ms) values ('time',$1,$2)", [thisRun, Date.now() - started]);
+  // Let the next page load pick up any Airtable colour changes.
+  try { await setState("choice_colors_at", "0"); } catch {}
+
   return { ok: true, mode: "backfill", done, pulled: thisRun, total_pulled: pulled, pushed_new: 0, pushed_upd: 0, fixed_dates: 0, ms: Date.now() - started };
 }
 

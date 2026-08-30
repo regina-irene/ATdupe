@@ -34,6 +34,7 @@ export default function Settings() {
   const [hex, setHex] = useState("");
   const [hues, setHues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setLook(get("efl_look", "firm"));
@@ -73,6 +74,17 @@ export default function Settings() {
     setHues(next); put("efl_hues", JSON.stringify(next));
     if (root().getAttribute("data-page") === page) root().style.removeProperty("--page");
   }
+  async function refreshAirtable() {
+    setBusy(true);
+    try {
+      const j = await (await fetch("/api/choices/refresh", { method: "POST" })).json();
+      if (j.error) throw new Error(j.error);
+      await fetch("/api/choices?refresh=1");
+      flash("Airtable colours and field names refreshed. Reload a board to see them.");
+    } catch (e: any) { flash("Could not refresh: " + e.message); }
+    setBusy(false);
+  }
+
   function resetAll() {
     if (!confirm("Put every appearance setting back to how it started?")) return;
     ["efl_look", "efl_mode", "efl_density", "efl_accent", "efl_accent_hex", "efl_hues"].forEach((k) => put(k, null));
@@ -145,6 +157,17 @@ export default function Settings() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card" data-tone="status">
+        <h2>Airtable colours</h2>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          The chips on every board use the colours you set in Airtable. They refresh on their own within
+          15 minutes, and whenever a sync runs. Use this if you have just changed one and want it now.
+        </p>
+        <button className="btn sm" disabled={busy} onClick={refreshAirtable}>
+          {busy ? "Refreshing..." : "Refresh Airtable colours now"}
+        </button>
       </div>
 
       <div className="card" data-tone="danger">

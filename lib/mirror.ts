@@ -72,7 +72,7 @@ export function isNumber(t: string) {
 }
 
 const KEY = (k: string) => "mirror_schema_" + k;
-const AGE = 6 * 60 * 60 * 1000;
+const AGE = 15 * 60 * 1000; // choice colours and field changes show up within 15 minutes
 
 export async function schemaFor(key: string, force = false): Promise<{ fields: Field[]; primary: string; label: string; singular: string }> {
   const cfg = resolve(key);

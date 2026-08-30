@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, q, ensureSchema, ymd } from "../../../../lib/db";
+import { db, q, ensureSchema, ymd, setState} from "../../../../lib/db";
 import { authorize } from "../../../../lib/auth";
 import { at, chunk, sleep, plain, BASE, PAY_TABLE, PF } from "../../../../lib/airtable";
 
@@ -145,6 +145,9 @@ async function run() {
 
   const ms = Date.now() - started;
   await q("insert into sync_log (kind, pulled, pushed_new, pushed_upd, ms) values ('payments',$1,$2,$3,$4)", [pulled, pushedNew, pushedUpd, ms]);
+  // Let the next page load pick up any Airtable colour changes.
+  try { await setState("choice_colors_at", "0"); } catch {}
+
   return { ok: true, pulled, pushed_new: pushedNew, pushed_upd: pushedUpd, ms };
 }
 

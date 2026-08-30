@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const KEY = "choice_colors";
 const AT_KEY = "choice_colors_at";
-const MAX_AGE = 6 * 60 * 60 * 1000;
+const MAX_AGE = 15 * 60 * 1000;
 
 // Mirrors Airtable's select colours so a status looks the same in both places.
 // Needs schema.bases:read on the token; without it the boards fall back to
