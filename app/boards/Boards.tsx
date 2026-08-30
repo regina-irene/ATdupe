@@ -113,6 +113,8 @@ export default function Boards() {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [tables, setTables] = useState<Record<string, Tbl[]>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [fullText, setFullText] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     try {
@@ -122,6 +124,7 @@ export default function Boards() {
         if (Array.isArray(saved) && saved.length) setShown(saved.filter((c: any) => COLUMNS.some((x) => x.id === c)));
       }
     } catch {}
+    try { setFullText(localStorage.getItem("efl.boards.fulltext") !== "0"); } catch {}
   }, []);
   function persist(next: string[]) {
     setShown(next);
@@ -354,11 +357,21 @@ export default function Boards() {
           : <b className={b.open_items > 9 ? "hot" : ""}>{b.open_items}</b>}</td>;
       case "files": return <td key={id} className="money">{b.files ? b.files.toLocaleString() : <span className="muted">-</span>}</td>;
       case "last_activity": return <td key={id} className="date small">{b.last_activity ? when(b.last_activity) : <span className="muted">-</span>}</td>;
-      case "update_text": return <td key={id} className="small">
-        {b.update_text
-          ? <span title={b.update_text}>{b.update_text.length > 150 ? b.update_text.slice(0, 150) + "..." : b.update_text}
-              {b.update_at ? <span className="muted"> · {when(b.update_at)}</span> : null}</span>
-          : <span className="muted">{b.rows ? "no client update" : "not synced yet"}</span>}</td>;
+      case "update_text": {
+        if (!b.update_text)
+          return <td key={id} className="small"><span className="muted">{b.rows ? "no client update" : "not synced yet"}</span></td>;
+        const open = fullText || expanded[b.base_id];
+        const long = b.update_text.length > 240;
+        return <td key={id} className="small">
+          {b.update_at ? <div className="muted small" style={{ marginBottom: 3 }}>{when(b.update_at)}</div> : null}
+          <div className={"upd" + (open ? " open" : "")}>{b.update_text}</div>
+          {long && !fullText ? (
+            <button className="updmore" onClick={() => setExpanded({ ...expanded, [b.base_id]: !expanded[b.base_id] })}>
+              {expanded[b.base_id] ? "Show less" : "Show more"}
+            </button>
+          ) : null}
+        </td>;
+      }
       case "last_sync": return <td key={id} className="date small">{b.last_sync ? when(b.last_sync) : <span className="muted">never</span>}</td>;
       case "last_result": return <td key={id} className="small muted">{b.last_result || ""}</td>;
       case "note": return <td key={id} className="small muted">{b.note || ""}</td>;
@@ -530,6 +543,10 @@ export default function Boards() {
                 </div>
               ) : null}
             </div>
+            <button className="btn sm" title="Show client updates in full, or trimmed to a few lines"
+              onClick={() => { const v = !fullText; setFullText(v); try { localStorage.setItem("efl.boards.fulltext", v ? "1" : "0"); } catch {} }}>
+              {fullText ? "Condense updates" : "Full updates"}
+            </button>
             <button className="btn sm" disabled={!!busy} onClick={syncAll}>{busy === "all" ? "Syncing all..." : "Sync all boards"}</button>
           </div>
         </div>

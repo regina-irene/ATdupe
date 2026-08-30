@@ -340,3 +340,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 
 .huerow input[type=color]{width:34px;height:28px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer}
 .card[data-tone=status]{--tone:#2563eb}
 :root[data-mode=dark] .card[data-tone=status]{--tone:#60a5fa}
+.upd{white-space:pre-wrap;line-height:1.5;max-height:4.5em;overflow:hidden}
+.upd.open{max-height:none}
+.updmore{background:none;border:none;color:var(--accent);font-weight:700;font-size:11px;cursor:pointer;padding:3px 0}
+.updmore:hover{text-decoration:underline}
+table.data td{vertical-align:top}

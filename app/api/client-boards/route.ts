@@ -113,7 +113,7 @@ export async function GET(req: Request) {
         b.files = filesByBase.get(b.base_id) ?? null;
         b.last_activity = lastByBase.get(b.base_id) || null;
         const u = updByBase.get(b.base_id);
-        b.update_text = u ? u.text.replace(/<[^>]*>/g, "").slice(0, 400) : null;
+        b.update_text = u ? u.text.replace(/<[^>]*>/g, "") : null;
         b.update_at = u ? u.at : null;
       }
     } catch {}
