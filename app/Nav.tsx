@@ -61,7 +61,7 @@ export default function Nav({ name }: { name?: string }) {
           {top("/", "Time", "time")}
           {top("/tasks", "Tasks", "tasks")}
           {top("/payments", "Payments", "payments")}
-          {top("/cases", "Cases", "cases")}
+          {top("/cases", "Case Status", "cases")}
           {top("/clients", "Clients", "clients")}
           {top("/boards", "Client Boards", "boards")}
           {top("/setup", "Setup", "setup")}

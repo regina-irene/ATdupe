@@ -18,7 +18,7 @@ const ACCENTS = [
 const PAGES = [
   { id: "board", label: "Time", d: "#2563eb" }, { id: "reports", label: "Reports", d: "#0891b2" },
   { id: "import", label: "Data", d: "#b45309" }, { id: "tasks", label: "Tasks", d: "#7c3aed" },
-  { id: "payments", label: "Payments", d: "#047857" }, { id: "cases", label: "Cases", d: "#c2410c" },
+  { id: "payments", label: "Payments", d: "#047857" }, { id: "cases", label: "Case Status", d: "#c2410c" },
   { id: "clients", label: "Clients", d: "#a21caf" }, { id: "boards", label: "Client Boards", d: "#4f46e5" },
   { id: "setup", label: "Setup", d: "#0f766e" },
 ];

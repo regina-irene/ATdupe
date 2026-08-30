@@ -7,7 +7,7 @@ Next.js App Router, deployed on Vercel, data in Neon Postgres, two-way sync with
 - **Time** - Board (capture and edit entries), Reports, Data (CSV / Excel export)
 - **Tasks** - the Airtable Tasks table, with saved views and a Modified column
 - **Payments** - firm income, two-way, with Airtable's formula splits read-only
-- **Cases** - the Status table, every field, with a column picker
+- **Case Status** - the Status table, every field, with a column picker
 - **Clients** - the Clients table, every field, with a column picker
 - **Setup** - environment status, sync controls, import and wipe
 

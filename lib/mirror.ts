@@ -4,7 +4,7 @@ import { getState, setState } from "./db";
 // Tables mirrored wholesale rather than mapped column by column. Adding a
 // field in Airtable makes it appear here with no code change.
 export const MIRRORS: Record<string, { table: string; label: string; singular: string }> = {
-  status: { table: process.env.AIRTABLE_TABLE_ID || "tbl3gCA0CQ0S6ewW6", label: "Cases", singular: "case" },
+  status: { table: process.env.AIRTABLE_TABLE_ID || "tbl3gCA0CQ0S6ewW6", label: "Case Status", singular: "case" },
   clients: { table: process.env.AIRTABLE_CLIENT_TABLE_ID || "tblPPcVwWJ3IjBRLu", label: "Clients", singular: "client" },
 };
 
