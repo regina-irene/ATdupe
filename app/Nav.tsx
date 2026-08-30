@@ -3,6 +3,11 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import ThemeMenu from "./ThemeMenu";
 
+const SETUP_PAGES = [
+  { href: "/setup", id: "setup", label: "Status" },
+  { href: "/settings", id: "settings", label: "Appearance" },
+];
+
 const TIME_PAGES = [
   { href: "/", id: "board", label: "Board" },
   { href: "/reports", id: "reports", label: "Reports" },
@@ -17,6 +22,7 @@ function pageKey(p: string) {
   if (p.startsWith("/cases")) return "cases";
   if (p.startsWith("/clients")) return "clients";
   if (p.startsWith("/boards")) return "boards";
+  if (p.startsWith("/settings")) return "settings";
   if (p.startsWith("/setup")) return "setup";
   return "board";
 }
@@ -24,9 +30,20 @@ function pageKey(p: string) {
 export default function Nav({ name }: { name?: string }) {
   const path = usePathname() || "/";
   const key = pageKey(path);
-  const group = ["tasks", "payments", "cases", "clients", "boards", "setup"].indexOf(key) >= 0 ? key : "time";
+  const group = key === "settings" ? "setup"
+    : ["tasks", "payments", "cases", "clients", "boards", "setup"].indexOf(key) >= 0 ? key : "time";
 
-  useEffect(() => { document.documentElement.setAttribute("data-page", key); }, [key]);
+  // Settings shares the Setup hue, and any saved tab colour wins.
+  useEffect(() => {
+    const r = document.documentElement;
+    const hue = key === "settings" ? "setup" : key;
+    r.setAttribute("data-page", hue);
+    try {
+      const saved = JSON.parse(localStorage.getItem("efl_hues") || "{}");
+      if (saved[hue]) r.style.setProperty("--page", saved[hue]);
+      else r.style.removeProperty("--page");
+    } catch {}
+  }, [key]);
 
   const top = (href: string, label: string, id: string) => (
     <a key={id} href={href} className={group === id ? "on" : ""}>{label}{group === id ? <i /> : null}</a>
@@ -56,9 +73,9 @@ export default function Nav({ name }: { name?: string }) {
         </div>
       </div>
       <div className="pagebar noprint" />
-      {group === "time" ? (
+      {group === "time" || group === "setup" ? (
         <div className="subnav noprint">
-          {TIME_PAGES.map((p) => (
+          {(group === "time" ? TIME_PAGES : SETUP_PAGES).map((p) => (
             <a key={p.id} href={p.href} className={key === p.id ? "on" : ""}>{p.label}</a>
           ))}
         </div>

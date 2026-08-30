@@ -60,7 +60,7 @@ export default function ThemeMenu() {
               <div key={a.id} title={a.id} className={"sw " + (accent === a.id ? "on" : "")} style={{ background: a.c }} onClick={() => { setAccent(a.id); set("efl_accent", a.id, "data-accent"); }} />
             ))}
           </div>
-          <p className="muted small" style={{ margin: "10px 0 0" }}>Saved on this device, just for you.</p>
+          <p className="muted small" style={{ margin: "10px 0 0" }}>Saved on this device, just for you. <a href="/settings">More settings</a></p>
         </div>
       ) : null}
     </div>
