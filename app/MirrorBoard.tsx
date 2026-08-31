@@ -11,6 +11,14 @@ type Row = { id: number; airtable_id: string | null; data: any; at_modified: str
 
 const TEXTY = ["singleLineText", "multilineText", "richText", "email", "url", "phoneNumber", "barcode"];
 const NUMY = ["number", "currency", "percent", "duration", "rating", "autoNumber"];
+const DATEY = ["date", "dateTime", "lastModifiedTime", "createdTime"];
+// Cases go amber then red when the client has not been updated.
+const STALE_DAYS = 14;
+const daysSince = (v: any) => {
+  if (!v) return Infinity;
+  const t = new Date(v).getTime();
+  return isNaN(t) ? Infinity : Math.floor((Date.now() - t) / 86400000);
+};
 
 function when(v: any): string {
   if (!v) return "";
@@ -245,12 +253,23 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   }
 
   function show(f: Field, v: any) {
-    if (v === null || v === undefined || v === "") return <span className="muted">-</span>;
+    if (v === null || v === undefined || v === "") {
+      if (clientUpdateField && f.id === clientUpdateField.id)
+        return <span className="stale bad">never<span className="staleage">no update</span></span>;
+      return <span className="muted">-</span>;
+    }
     if (f.type === "checkbox") return v ? "Yes" : <span className="muted">No</span>;
     if (f.type === "singleSelect") return <Chip v={v} colors={colorsFor(f)} />;
     if (f.type === "multipleSelects") return <Chip v={Array.isArray(v) ? v.join(", ") : v} colors={colorsFor(f)} />;
-    if (f.type === "date") return String(v).slice(0, 10);
-    if (f.type === "dateTime" || f.type === "lastModifiedTime" || f.type === "createdTime") return when(v);
+    if (f.type === "date" || f.type === "dateTime") {
+      const txt = f.type === "date" ? String(v).slice(0, 10) : when(v);
+      if (clientUpdateField && f.id === clientUpdateField.id) {
+        const d = daysSince(v);
+        if (d >= STALE_DAYS) return <span className={"stale" + (d >= STALE_DAYS * 2 ? " bad" : "")}>{txt}<span className="staleage">{d} days</span></span>;
+      }
+      return txt;
+    }
+    if (f.type === "lastModifiedTime" || f.type === "createdTime") return when(v);
     if (f.type === "url") return <a href={String(v)} target="_blank" rel="noreferrer">link</a>;
     if (f.type === "multipleRecordLinks") return <span className="muted small">{(v as any[]).length} linked</span>;
     if (f.type === "multipleAttachments") return <span className="muted small">{(v as any[]).length} file(s)</span>;
@@ -281,15 +300,17 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   // Which comparisons make sense for a field type.
   function opsFor(f: Field): [string, string][] {
     const base: [string, string][] = [["empty", "is empty"], ["notempty", "is not empty"]];
-    if (f.type === "singleSelect" || f.type === "multipleSelects") return [["eq", "is any of"], ...base];
+    if (f.type === "singleSelect" || f.type === "multipleSelects")
+      return [["eq", "is any of"], ["nin", "is none of"], ...base];
     if (f.type === "checkbox") return [["bool", "is"]];
-    if (f.type === "date" || f.type === "dateTime" || f.type === "lastModifiedTime" || f.type === "createdTime")
-      return [["gte", "on or after"], ["lte", "on or before"], ...base];
+    if (DATEY.indexOf(f.type) >= 0)
+      return [["stale", "not updated in (days)"], ["fresh", "updated in the last (days)"],
+              ["gte", "on or after"], ["lte", "on or before"], ...base];
     if (NUMY.indexOf(f.type) >= 0) return [["gte", "at least"], ["lte", "at most"], ...base];
-    return [["has", "contains"], ...base];
+    return [["has", "contains"], ["nhas", "does not contain"], ...base];
   }
   function defaultOp(f: Field) { return opsFor(f)[0][0]; }
-  function defaultVal(op: string) { return op === "eq" ? [] : op === "bool" ? "true" : ""; }
+  function defaultVal(op: string) { return op === "eq" || op === "nin" ? [] : op === "bool" ? "true" : op === "stale" || op === "fresh" ? "14" : ""; }
 
   function addCond(f: Field) {
     const op = defaultOp(f);
@@ -314,9 +335,12 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
 
   function condInput(c: Cond, i: number, f: Field) {
     if (c.op === "empty" || c.op === "notempty") return <div className="muted small" style={{ paddingTop: 20 }}>&nbsp;</div>;
-    if (c.op === "eq") return (
+    if (c.op === "eq" || c.op === "nin") return (
       <MultiSelect label="Value" allLabel="Any" options={(f.choices || []).map((x) => x.name)}
         value={Array.isArray(c.val) ? c.val : []} onChange={(v) => setVal(i, v)} />);
+    if (c.op === "stale" || c.op === "fresh") return (
+      <><label className="f">Days</label>
+        <input type="number" min={0} value={c.val ?? "14"} onChange={(e) => setVal(i, e.target.value)} /></>);
     if (c.op === "bool") return (
       <><label className="f">Value</label>
         <select value={String(c.val)} onChange={(e) => setVal(i, e.target.value)}>
@@ -332,6 +356,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
       <input type="search" value={c.val ?? ""} onChange={(e) => setVal(i, e.target.value)} placeholder="contains" /></>);
   }
 
+  const clientUpdateField = fields.find((f) => DATEY.indexOf(f.type) >= 0 && /updated\s*(for|to)\s*client/i.test(f.name));
   const closedField = fields.find((f) => f.type === "checkbox" && f.name.trim().toLowerCase() === "closed");
   const closedPick = closedField ? String(conds.find((c) => c.fid === closedField.id)?.val ?? "") : "";
 
@@ -420,6 +445,18 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
         <div className="row" style={{ marginTop: 9 }}>
           <div style={{ flex: 1 }}><label className="f">Search everything</label>
             <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, note, anything" /></div>
+          {clientUpdateField ? (
+            <div className="chips" style={{ marginTop: 0, alignSelf: "flex-end", paddingBottom: 2 }}>
+              <button className={"chip " + (conds.some((c) => c.fid === clientUpdateField.id && c.op === "stale") ? "on" : "")}
+                title={"Cases where " + clientUpdateField.name + " is over two weeks old or never set"}
+                onClick={() => {
+                  const on = conds.some((c) => c.fid === clientUpdateField.id && c.op === "stale");
+                  setConds(on ? conds.filter((c) => !(c.fid === clientUpdateField.id && c.op === "stale"))
+                    : [...conds, { fid: clientUpdateField.id, op: "stale", val: String(STALE_DAYS) }]);
+                  setPage(1);
+                }}>Client update overdue</button>
+            </div>
+          ) : null}
           {closedField ? (
             <div className="chips" style={{ marginTop: 0, alignSelf: "flex-end", paddingBottom: 2 }}>
               {[["", "All"], ["false", "Open"], ["true", "Closed"]].map(([v, lab]) => (

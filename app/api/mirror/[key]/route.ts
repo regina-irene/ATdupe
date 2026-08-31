@@ -27,6 +27,7 @@ export async function GET(req: Request, ctx: any) {
     // Conditions arrive as repeatable f=<fieldId>:<op>:<value>.
     // ops: eq (repeat for several values), has, bool, gte, lte, empty, notempty
     const eqByField = new Map<string, string[]>();
+    const neByField = new Map<string, string[]>();
     for (const raw of sp.getAll("f")) {
       const i = raw.indexOf(":");
       if (i < 1) continue;
@@ -39,9 +40,21 @@ export async function GET(req: Request, ctx: any) {
       const jpath = `data->'${fid}'`;
       if (op === "eq") {
         eqByField.set(fid, [...(eqByField.get(fid) || []), val]);
+      } else if (op === "nin") {
+        neByField.set(fid, [...(neByField.get(fid) || []), val]);
       } else if (op === "has") {
         params.push("%" + val + "%");
         where.push(`${path} ilike $${params.length}`);
+      } else if (op === "nhas") {
+        params.push("%" + val + "%");
+        where.push(`coalesce(${path},'') not ilike $${params.length}`);
+      } else if (op === "stale" || op === "fresh") {
+        // "stale" counts a blank as overdue, which is the point of asking.
+        const n = Math.max(0, parseInt(val || "14", 10));
+        params.push(n + " days");
+        const iv = `$${params.length}::interval`;
+        if (op === "stale") where.push(`(${jpath} is null or ${path} = '' or (nullif(${path},''))::timestamptz < now() - ${iv})`);
+        else where.push(`(nullif(${path},''))::timestamptz >= now() - ${iv}`);
       } else if (op === "bool") {
         params.push(val === "true");
         where.push(`coalesce((${jpath})::boolean, false) = $${params.length}`);
@@ -58,6 +71,16 @@ export async function GET(req: Request, ctx: any) {
         where.push(`(${jpath} is null or ${path} = '' or ${jpath} = '[]'::jsonb)`);
       } else if (op === "notempty") {
         where.push(`(${jpath} is not null and ${path} <> '' and ${jpath} <> '[]'::jsonb)`);
+      }
+    }
+    for (const [fid, vals] of neByField) {
+      const f = byId.get(fid)!;
+      if (f.type === "multipleSelects") {
+        const ands = vals.map((v) => { params.push(JSON.stringify([v])); return `not (data->'${fid}' @> $${params.length}::jsonb)`; });
+        where.push("(" + ands.join(" and ") + ")");
+      } else {
+        params.push(vals);
+        where.push(`coalesce(data->>'${fid}','') <> all($${params.length}::text[])`);
       }
     }
     for (const [fid, vals] of eqByField) {

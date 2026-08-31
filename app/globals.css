@@ -345,3 +345,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 
 .updmore{background:none;border:none;color:var(--accent);font-weight:700;font-size:11px;cursor:pointer;padding:3px 0}
 .updmore:hover{text-decoration:underline}
 table.data td{vertical-align:top}
+.stale{display:inline-flex;flex-direction:column;line-height:1.25;font-weight:700;color:var(--warn)}
+.stale.bad{color:var(--danger)}
+.staleage{font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;opacity:.85}
+table.data tbody tr:has(.stale.bad) td:first-child{box-shadow:inset 3px 0 0 var(--danger)}
