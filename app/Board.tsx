@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FIRMS, KINDS, QUICK_HOURS, CF } from "../lib/constants";
 import Chip, { useChoices } from "./Chip";
+import { Resizer, useColWidths } from "./colwidths";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 
 function today() {
@@ -66,6 +67,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
   const choices = useChoices();
+  const cw = useColWidths("efl.time.widths");
   const [groupId, setGroupId] = useState("");
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const [polishing, setPolishing] = useState(false);
@@ -147,8 +149,13 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
     setPage(1);
   }
 
-  function Th({ id, label, style }: { id: string; label: string; style?: any }) {
-    return (<th className="sortable" style={style} onClick={() => toggleSort(id)}>{label}{sort === id ? <span className="ar">{dir === "asc" ? "▲" : "▼"}</span> : null}</th>);
+  function Th({ id, label, w }: { id: string; label: string; w?: number }) {
+    return (
+      <th className="sortable" style={cw.widthOf(id, w)} onClick={() => toggleSort(id)}>
+        {label}{sort === id ? <span className="ar">{dir === "asc" ? "▲" : "▼"}</span> : null}
+        <Resizer onDown={(e) => cw.start(e, id)} />
+      </th>
+    );
   }
 
   async function polish() {
@@ -305,19 +312,20 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
             </select>
             <a className="btn sm" href={"/api/entries/export?" + filterQS}>Excel / CSV</a>
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
+            {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
         </div>
         <div className="tablewrap">
-          <table className="data">
+          <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
-              <Th id="date" label="Date" style={{ width: 88 }} />
-              <Th id="case" label="Case" style={{ width: 190 }} />
+              <Th id="date" label="Date" w={88} />
+              <Th id="case" label="Case" w={190} />
               <Th id="entry" label="Entry" />
-              <Th id="hrs" label="Hrs" style={{ width: 54 }} />
-              <Th id="who" label="Who" style={{ width: 112 }} />
-              <Th id="type" label="Type" style={{ width: 128 }} />
+              <Th id="hrs" label="Hrs" w={54} />
+              <Th id="who" label="Who" w={112} />
+              <Th id="type" label="Type" w={128} />
               <th className="noprint" style={{ width: 58 }}></th>
             </tr></thead>
             <tbody>

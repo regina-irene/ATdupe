@@ -4,6 +4,7 @@ import { TASK_USERS, prioClass } from "../../lib/constants";
 import MultiSelect from "../MultiSelect";
 import Chip, { useChoices } from "../Chip";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
+import { Resizer, useColWidths } from "../colwidths";
 import { CF } from "../../lib/constants";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
@@ -90,6 +91,7 @@ export default function Tasks() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const dragged = useRef(false);
+  const cw = useColWidths("efl.tasks.widths");
 
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState<any>({});
@@ -344,17 +346,17 @@ export default function Tasks() {
           <div className="row noprint">
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <span className="muted small">Click a heading to sort. Drag a heading to move the column.</span>
-            <button className="btn sm" onClick={resetColumns}>Reset columns</button>
+            <button className="btn sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
         </div>
 
         <div className="tablewrap">
-          <table className="data">
+          <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
               {cols.map((c) => (
-                <th key={c.id} style={c.width ? { width: c.width } : undefined}
+                <th key={c.id} style={cw.widthOf(c.id, c.width)}
                     className={"sortable" + (overId === c.id ? " over" : "") + (dragId === c.id ? " dragging" : "")}
                     draggable
                     onDragStart={() => { dragged.current = true; setDragId(c.id); }}
@@ -366,6 +368,7 @@ export default function Tasks() {
                     onClick={() => sortBy(c.id)}>
                   <span className="grip">⠿</span>{c.label}
                   <span className="caret">{sort === c.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+                  <Resizer onDown={(e) => cw.start(e, c.id)} />
                 </th>
               ))}
               <th className="noprint" style={{ width: 62 }}></th>

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MultiSelect from "./MultiSelect";
 import Chip from "./Chip";
+import { Resizer, useColWidths } from "./colwidths";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
@@ -59,6 +60,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const dragged = useRef(false);
+  const cw = useColWidths(LAYOUT.replace(".columns", ".widths"));
   const pickerBox = useRef<HTMLDivElement>(null);
 
   const [editing, setEditing] = useState<number | null>(null);
@@ -521,7 +523,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                   <input type="search" autoFocus placeholder="Find a field..." value={term} onChange={(e) => setTerm(e.target.value)} />
                   <div className="msrow">
                     <button className="btn ghost sm" onClick={() => persist(pickerList.map((f) => f.id))}>Show all</button>
-                    <button className="btn ghost sm" onClick={() => persist(fields.slice(0, 8).map((f) => f.id))}>Reset</button>
+                    <button className="btn ghost sm" onClick={() => { persist(fields.slice(0, 8).map((f) => f.id)); cw.reset(); }}>Reset</button>
                     <div className="spacer" />
                     <button className="btn ghost sm" onClick={() => setPicker(false)}>Done</button>
                   </div>
@@ -538,16 +540,17 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
               ) : null}
             </div>
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
+            {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
         </div>
 
         <div className="tablewrap">
-          <table className="data">
+          <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
               {cols.map((f) => (
-                <th key={f.id} className={"sortable" + (overId === f.id ? " over" : "") + (dragId === f.id ? " dragging" : "")}
+                <th key={f.id} style={cw.widthOf(f.id)} className={"sortable" + (overId === f.id ? " over" : "") + (dragId === f.id ? " dragging" : "")}
                     draggable
                     onDragStart={() => { dragged.current = true; setDragId(f.id); }}
                     onDragEnd={() => { setDragId(null); setOverId(null); setTimeout(() => { dragged.current = false; }, 60); }}
@@ -557,6 +560,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                     onClick={() => sortBy(f.id)}>
                   <span className="grip">⠿</span>{f.name}
                   <span className="caret">{sort === f.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+                  <Resizer onDown={(e) => cw.start(e, f.id)} />
                 </th>
               ))}
               {linksBoards ? <th className="noprint" style={{ width: 92 }}>Client board</th> : null}

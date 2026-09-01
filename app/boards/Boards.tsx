@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Resizer, useColWidths } from "../colwidths";
 
 type Board = {
   id: number; base_id: string; label: string; case_name: string | null; note: string | null;
@@ -109,6 +110,7 @@ export default function Boards() {
   const pickerBox = useRef<HTMLDivElement>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const dragged = useRef(false);
+  const cw = useColWidths("efl.boards.widths");
 
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [tables, setTables] = useState<Record<string, Tbl[]>>({});
@@ -526,7 +528,7 @@ export default function Boards() {
                 <div className="mspanel" style={{ right: 0, left: "auto" }}>
                   <div className="msrow">
                     <button className="btn ghost sm" onClick={() => persist(COLUMNS.map((c) => c.id))}>Show all</button>
-                    <button className="btn ghost sm" onClick={() => persist(DEFAULT_COLS)}>Reset</button>
+                    <button className="btn ghost sm" onClick={() => { persist(DEFAULT_COLS); cw.reset(); }}>Reset</button>
                     <div className="spacer" />
                     <button className="btn ghost sm" onClick={() => setPicker(false)}>Done</button>
                   </div>
@@ -552,10 +554,10 @@ export default function Boards() {
         </div>
 
         <div className="tablewrap">
-          <table className="data">
+          <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
               {cols.map((c) => (
-                <th key={c.id} style={c.width ? { width: c.width } : undefined} className="sortable" draggable
+                <th key={c.id} style={cw.widthOf(c.id, c.width)} className="sortable" draggable
                     onDragStart={() => { dragged.current = true; setDragId(c.id); }}
                     onDragEnd={() => { setDragId(null); setTimeout(() => { dragged.current = false; }, 60); }}
                     onDragOver={(e) => e.preventDefault()}
@@ -563,6 +565,7 @@ export default function Boards() {
                     onClick={() => sortBy(c.id)}>
                   <span className="grip">⠿</span>{c.label}
                   <span className="caret">{sort === c.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+                  <Resizer onDown={(e) => cw.start(e, c.id)} />
                 </th>
               ))}
               <th className="noprint" style={{ width: 190 }}></th>
