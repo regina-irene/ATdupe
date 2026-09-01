@@ -22,6 +22,7 @@ function pageKey(p: string) {
   if (p.startsWith("/cases")) return "cases";
   if (p.startsWith("/clients")) return "clients";
   if (p.startsWith("/boards")) return "boards";
+  if (p.startsWith("/gal")) return "gal";
   if (p.startsWith("/dashboard")) return "dashboard";
   if (p.startsWith("/settings")) return "settings";
   if (p.startsWith("/setup")) return "setup";
@@ -32,7 +33,7 @@ export default function Nav({ name }: { name?: string }) {
   const path = usePathname() || "/";
   const key = pageKey(path);
   const group = key === "settings" ? "setup"
-    : ["dashboard", "tasks", "payments", "cases", "clients", "boards", "setup"].indexOf(key) >= 0 ? key : "time";
+    : ["dashboard", "tasks", "payments", "cases", "clients", "boards", "gal", "setup"].indexOf(key) >= 0 ? key : "time";
 
   // Settings shares the Setup hue, and any saved tab colour wins.
   useEffect(() => {
@@ -66,6 +67,7 @@ export default function Nav({ name }: { name?: string }) {
           {top("/cases", "Case Status", "cases")}
           {top("/clients", "Clients", "clients")}
           {top("/boards", "Client Boards", "boards")}
+          {top("/gal", "GAL Status", "gal")}
           {top("/setup", "Setup", "setup")}
         </nav>
         <div className="who">
