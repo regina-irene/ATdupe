@@ -61,7 +61,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const dragged = useRef(false);
-  const cw = useColWidths(LAYOUT.replace(".columns", ".widths"));
+  const cw = useColWidths("efl.mirror." + boardKey + ".widths");
   const pickerBox = useRef<HTMLDivElement>(null);
 
   const [editing, setEditing] = useState<number | null>(null);
