@@ -395,8 +395,24 @@ table.data td{padding:var(--rowpad) 9px}
 :root[data-mode=dark] .tag.k-task{background:#04785755;color:#6ee7b7}
 .dash{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
 .dash > .card{margin-bottom:0}
-.dash .feed{max-height:68vh;overflow-y:auto}
+.dash .feed{overflow-y:auto}
 .dash .feedage{font-size:10.5px;text-align:right}
 .dash .stats{flex-wrap:wrap}
 @media (max-width:1100px){.dash{grid-template-columns:1fr}}
 @media print{.dash{grid-template-columns:1fr}.dash .feed{max-height:none}}
+.dashbar{margin-bottom:9px;gap:7px;align-items:center}
+.dash.h-n .feed{max-height:70vh}
+.dash.h-t .feed{max-height:150vh}
+.dash.h-f .feed{max-height:none}
+.dash.txt-s .feedrow{padding:5px 9px;gap:8px}
+.dash.txt-s .feedmain b{font-size:12px}
+.dash.txt-s .feedmain .small{font-size:10.5px;-webkit-line-clamp:1;line-clamp:1}
+.dash.txt-s .feedage{font-size:9.5px}
+.dash.txt-s .feedglyph{font-size:12.5px;width:16px}
+.dash.txt-s .tag{font-size:9px;padding:1px 6px}
+.dash.txt-s .feedday{padding:4px 9px;font-size:9px}
+.dash.txt-l .feedrow{padding:11px 13px}
+.dash.txt-l .feedmain b{font-size:15px}
+.dash.txt-l .feedmain .small{font-size:13px;-webkit-line-clamp:3;line-clamp:3}
+.dash.txt-l .feedage{font-size:12px}
+.dash.txt-l .feedglyph{font-size:17px}

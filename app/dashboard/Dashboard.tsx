@@ -51,8 +51,21 @@ export default function Dashboard() {
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("all");
   const [keyInput, setKeyInput] = useState("");
+  const [txt, setTxt] = useState("m");
+  const [tall, setTall] = useState("n");
+  const [kind, setKind] = useState("all");
+  const [order, setOrder] = useState("new");
 
-  useEffect(() => { try { setFilter(localStorage.getItem("efl_activity_filter") || "all"); } catch {} }, []);
+  useEffect(() => {
+    try {
+      setFilter(localStorage.getItem("efl_activity_filter") || "all");
+      setTxt(localStorage.getItem("efl_dash_text") || "m");
+      setTall(localStorage.getItem("efl_dash_tall") || "n");
+      setKind(localStorage.getItem("efl_dash_kind") || "all");
+      setOrder(localStorage.getItem("efl_dash_order") || "new");
+    } catch {}
+  }, []);
+  const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} };
 
   const load = useCallback(async () => {
     setLoading(true); setErr("");
@@ -82,7 +95,28 @@ export default function Dashboard() {
     setKeyInput(""); load();
   }
 
-  const tasks: any[] = data?.tasks || [];
+  const allTasks: any[] = data?.tasks || [];
+
+  // Only offer the kinds actually present, each with its count.
+  const kinds = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of allTasks) counts.set(t.kind || "other", (counts.get(t.kind || "other") || 0) + 1);
+    return [...counts.entries()]
+      .map(([id, n]) => ({ id, label: (KIND[id] || ["Task"])[0], cls: (KIND[id] || ["", "k-review"])[1], n }))
+      .sort((a, b) => b.n - a.n);
+  }, [allTasks]);
+
+  const tasks = useMemo(() => {
+    const list = kind === "all" ? allTasks : allTasks.filter((t) => (t.kind || "other") === kind);
+    const by = [...list];
+    if (order === "old") by.sort((a, b) => (String(a.since) > String(b.since) ? 1 : -1));
+    else if (order === "case") by.sort((a, b) => String(a.matterName || "").localeCompare(String(b.matterName || "")));
+    else if (order === "kind") by.sort((a, b) =>
+      String((KIND[a.kind] || ["Task"])[0]).localeCompare(String((KIND[b.kind] || ["Task"])[0]))
+      || (String(a.since) < String(b.since) ? 1 : -1));
+    else by.sort((a, b) => (String(a.since) < String(b.since) ? 1 : -1));
+    return by;
+  }, [allTasks, kind, order]);
   const activity: any[] = data?.activity || [];
   const shown = useMemo(() => (filter === "all" ? activity : activity.filter((i) => i.type === filter)), [activity, filter]);
 
@@ -119,7 +153,24 @@ export default function Dashboard() {
         </div>
       ) : null}
 
-      <div className="dash">
+      <div className="row noprint dashbar">
+        <span className="muted small">Text</span>
+        <div className="seg rowsize">
+          {[["s", "S"], ["m", "M"], ["l", "L"]].map(([id, lab]) => (
+            <button key={id} className={txt === id ? "on" : ""} onClick={() => { setTxt(id); remember("efl_dash_text", id); }}>{lab}</button>
+          ))}
+        </div>
+        <span className="muted small" style={{ marginLeft: 6 }}>Height</span>
+        <div className="seg rowsize">
+          {[["n", "Normal"], ["t", "Tall"], ["f", "Full"]].map(([id, lab]) => (
+            <button key={id} className={tall === id ? "on" : ""} onClick={() => { setTall(id); remember("efl_dash_tall", id); }}>{lab}</button>
+          ))}
+        </div>
+        <div className="spacer" />
+        <span className="muted small">{data?.generatedAt ? "Updated " + stampOf(data.generatedAt) : ""}</span>
+      </div>
+
+      <div className={"dash txt-" + txt + " h-" + tall}>
       <div className="card" data-tone="todo">
         <div className="row" style={{ marginBottom: 9 }}>
           <div className="stats">
@@ -133,14 +184,30 @@ export default function Dashboard() {
           </div>
           <div className="spacer" />
           <div className="row noprint">
+            <select value={order} onChange={(e) => { setOrder(e.target.value); remember("efl_dash_order", e.target.value); }} style={{ width: 128 }}>
+              <option value="new">Newest first</option>
+              <option value="old">Oldest first</option>
+              <option value="case">By case</option>
+              <option value="kind">By type</option>
+            </select>
             <button className="btn sm" disabled={loading} onClick={load}>{loading ? "Refreshing..." : "Refresh"}</button>
             <a className="btn sm" href={TASKS_URL} target="_blank" rel="noreferrer">FileFlow</a>
             <a className="btn sm" href={PORTAL_TASKS_URL} target="_blank" rel="noreferrer">Portal</a>
           </div>
         </div>
         <h2>To do</h2>
+        {kinds.length ? (
+          <div className="chips noprint" style={{ marginBottom: 8 }}>
+            <button className={"chip " + (kind === "all" ? "on" : "")}
+              onClick={() => { setKind("all"); remember("efl_dash_kind", "all"); }}>All {allTasks.length}</button>
+            {kinds.map((k) => (
+              <button key={k.id} className={"chip " + (kind === k.id ? "on" : "")}
+                onClick={() => { setKind(k.id); remember("efl_dash_kind", k.id); }}>{k.label} {k.n}</button>
+            ))}
+          </div>
+        ) : null}
         {!tasks.length ? (
-          <p className="muted small">{loading ? "Loading..." : needKey ? "Waiting on a feed key." : "All caught up. Nothing open."}</p>
+          <p className="muted small">{loading ? "Loading..." : needKey ? "Waiting on a feed key." : kind !== "all" ? "Nothing open of that type." : "All caught up. Nothing open."}</p>
         ) : (
           <div className="feed">
             {tasks.map((t, i) => {
