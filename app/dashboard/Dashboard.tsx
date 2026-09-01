@@ -18,32 +18,32 @@ const KIND: Record<string, [string, string]> = {
 const GLYPH: Record<string, string> = { note: "📌", message: "💬", file: "📎", task: "✅" };
 const TYPES: [string, string][] = [["all", "All"], ["note", "Notes"], ["message", "Messages"], ["file", "Files"], ["task", "Tasks"]];
 
-function relTime(iso: string) {
-  const t = new Date(iso).getTime();
-  if (isNaN(t)) return "";
-  const mins = Math.floor((Date.now() - t) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return mins + "m";
-  const h = Math.floor(mins / 60);
-  if (h < 24) return h + "h";
-  const d = Math.floor(h / 24);
-  return d < 30 ? d + "d" : Math.floor(d / 30) + "mo";
+// Actual date and time, never "19h". The year appears only when it is not this one.
+function stampOf(iso: string) {
+  const t = new Date(iso);
+  if (isNaN(t.getTime())) return "";
+  const sameYear = t.getFullYear() === new Date().getFullYear();
+  const date = t.toLocaleDateString([], sameYear
+    ? { month: "short", day: "numeric" }
+    : { month: "short", day: "numeric", year: "numeric" });
+  return date + ", " + t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
+const fullStamp = (iso: string) => {
+  const t = new Date(iso);
+  return isNaN(t.getTime()) ? "" : t.toLocaleString();
+};
 function dayLabel(iso: string) {
   const t = new Date(iso);
   if (isNaN(t.getTime())) return "Earlier";
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const d = new Date(t); d.setHours(0, 0, 0, 0);
   const diff = Math.round((today.getTime() - d.getTime()) / 86400000);
-  if (diff <= 0) return "Today";
-  if (diff === 1) return "Yesterday";
-  if (diff < 7) return t.toLocaleDateString([], { weekday: "long" });
-  return t.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  const date = t.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  if (diff <= 0) return "Today · " + date;
+  if (diff === 1) return "Yesterday · " + date;
+  if (diff < 7) return t.toLocaleDateString([], { weekday: "long" }) + " · " + date;
+  return date;
 }
-const clock = (iso: string) => {
-  const t = new Date(iso);
-  return isNaN(t.getTime()) ? "" : t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-};
 
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
@@ -119,6 +119,7 @@ export default function Dashboard() {
         </div>
       ) : null}
 
+      <div className="dash">
       <div className="card" data-tone="todo">
         <div className="row" style={{ marginBottom: 9 }}>
           <div className="stats">
@@ -153,7 +154,7 @@ export default function Dashboard() {
                       {t.matterName}{t.matterType ? " · " + t.matterType : ""}{t.detail ? " — " + t.detail : ""}
                     </span>
                   </span>
-                  <span className="feedage">{relTime(t.since)}</span>
+                  <span className="feedage" title={fullStamp(t.since)}>{stampOf(t.since)}</span>
                 </a>
               );
             })}
@@ -191,7 +192,7 @@ export default function Dashboard() {
                         <b>{i.matterName}</b>
                         <span className="muted small">{i.actor ? i.actor + " · " : ""}{i.text}</span>
                       </span>
-                      <span className="feedage">{clock(i.at)}</span>
+                      <span className="feedage" title={fullStamp(i.at)}>{stampOf(i.at)}</span>
                     </a>
                   ))}
                 </div>
@@ -200,6 +201,7 @@ export default function Dashboard() {
           )}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

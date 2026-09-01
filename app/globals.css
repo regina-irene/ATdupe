@@ -393,3 +393,10 @@ table.data td{padding:var(--rowpad) 9px}
 :root[data-mode=dark] .tag.k-docs{background:#a1620755;color:#fcd34d}
 :root[data-mode=dark] .tag.k-question{background:#6d28d955;color:#c4b5fd}
 :root[data-mode=dark] .tag.k-task{background:#04785755;color:#6ee7b7}
+.dash{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+.dash > .card{margin-bottom:0}
+.dash .feed{max-height:68vh;overflow-y:auto}
+.dash .feedage{font-size:10.5px;text-align:right}
+.dash .stats{flex-wrap:wrap}
+@media (max-width:1100px){.dash{grid-template-columns:1fr}}
+@media print{.dash{grid-template-columns:1fr}.dash .feed{max-height:none}}
