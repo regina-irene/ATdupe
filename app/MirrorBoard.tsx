@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MultiSelect from "./MultiSelect";
 import Chip from "./Chip";
 import { Resizer, useColWidths } from "./colwidths";
+import RowSize from "./RowSize";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
@@ -279,7 +280,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
     if (Array.isArray(v)) return <span className="small">{v.map((x) => (x && typeof x === "object" ? x.name : x)).join(", ")}</span>;
     if (NUMY.indexOf(f.type) >= 0) return <span className="money">{String(v)}</span>;
     const t = strip(v);
-    return <span title={t.length > 90 ? t : undefined}>{t.length > 90 ? t.slice(0, 90) + "..." : t}</span>;
+    return <div className="cellclip" title={t.length > 90 ? t : undefined}>{t}</div>;
   }
 
   function input(f: Field, val: any, set: (v: any) => void) {
@@ -539,6 +540,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                 </div>
               ) : null}
             </div>
+            <RowSize />
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>

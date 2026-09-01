@@ -4,6 +4,7 @@ import MultiSelect from "../MultiSelect";
 import Chip, { useChoices } from "../Chip";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { Resizer, useColWidths } from "../colwidths";
+import RowSize from "../RowSize";
 import { CF } from "../../lib/constants";
 
 const money = (v: any) =>
@@ -203,7 +204,7 @@ export default function Payments() {
       case "method": return <td key={id} className="small"><Chip v={p.method} colors={choices[CF.payMethod]} /></td>;
       case "type": return <td key={id} className="small"><Chip v={p.case_type} colors={choices[CF.payType]} /></td>;
       case "cleared": return <td key={id} className="small"><Chip v={p.cleared} colors={choices[CF.payCleared]} /></td>;
-      case "notes": return <td key={id} className="small">{p.notes}</td>;
+      case "notes": return <td key={id} className="small"><div className="cellclip">{p.notes}</div></td>;
       case "profit": return <td key={id} className="money muted">{money(p.profit)}</td>;
       case "owner": return <td key={id} className="money muted">{money(p.owner_pay)}</td>;
       case "tax": return <td key={id} className="money muted">{money(p.tax)}</td>;
@@ -305,6 +306,7 @@ export default function Payments() {
           </div>
           <div className="spacer" />
           <div className="row noprint">
+            <RowSize />
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <span className="muted small">Click a heading to sort. Drag to move.</span>
             <button className="btn sm" onClick={() => { persist(DEFAULT_ORDER); cw.reset(); }}>Reset columns</button>

@@ -5,6 +5,7 @@ import MultiSelect from "../MultiSelect";
 import Chip, { useChoices } from "../Chip";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { Resizer, useColWidths } from "../colwidths";
+import RowSize from "../RowSize";
 import { CF } from "../../lib/constants";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
@@ -265,7 +266,7 @@ export default function Tasks() {
       case "case":
         return <td key={id}>{t.case_name || t.client_name || <span className="muted">-</span>}</td>;
       case "task":
-        return <td key={id}>{t.task}{t.link ? <> <a href={t.link} target="_blank" rel="noreferrer" className="small noprint">file</a></> : null}</td>;
+        return <td key={id}><div className="cellclip">{t.task}</div>{t.link ? <> <a href={t.link} target="_blank" rel="noreferrer" className="small noprint">file</a></> : null}</td>;
       case "status":
         return <td key={id} className="small"><Chip v={t.status} colors={choices[CF.taskStatus]} /></td>;
       case "who":
@@ -344,6 +345,7 @@ export default function Tasks() {
           <div className="stats"><div className="stat"><b>{total.toLocaleString()}</b><span>{showClosed ? "Tasks" : "Open tasks"}</span></div></div>
           <div className="spacer" />
           <div className="row noprint">
+            <RowSize />
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <span className="muted small">Click a heading to sort. Drag a heading to move the column.</span>
             <button className="btn sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset columns</button>

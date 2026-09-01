@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Resizer, useColWidths } from "../colwidths";
+import RowSize from "../RowSize";
 
 type Board = {
   id: number; base_id: string; label: string; case_name: string | null; note: string | null;
@@ -519,6 +520,7 @@ export default function Boards() {
           <div className="spacer" />
           <div className="row noprint">
             <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a board" style={{ width: 150 }} />
+            <RowSize />
             <select value={group} onChange={(e) => setGroup(e.target.value)} style={{ width: 165 }}>
               {GROUPS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
             </select>

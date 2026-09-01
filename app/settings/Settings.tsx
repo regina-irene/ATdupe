@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import RowSize from "../RowSize";
 
 const LOOKS = [
   { id: "firm", name: "Firm", blurb: "The current look, tidied. Navy chrome, soft cards, comfortable spacing.", sw: ["#1f3a5f", "#f4f6f9", "#ffffff"] },
@@ -114,7 +115,7 @@ export default function Settings() {
 
       <div className="card" data-tone="status">
         <h2>Basics</h2>
-        <div className="grid g3">
+        <div className="grid g4">
           <div><label className="f">Light or dark</label>
             <div className="seg">
               {["light", "dark", "auto"].map((m) => (
@@ -128,6 +129,9 @@ export default function Settings() {
                 <button key={d} className={density === d ? "on" : ""} onClick={() => pickDensity(d)}>{d[0].toUpperCase() + d.slice(1)}</button>
               ))}
             </div>
+          </div>
+          <div><label className="f">Row height</label>
+            <RowSize />
           </div>
           <div><label className="f">Your own accent</label>
             <div className="row">

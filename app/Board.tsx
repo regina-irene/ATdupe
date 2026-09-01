@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FIRMS, KINDS, QUICK_HOURS, CF } from "../lib/constants";
 import Chip, { useChoices } from "./Chip";
 import { Resizer, useColWidths } from "./colwidths";
+import RowSize from "./RowSize";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 
 function today() {
@@ -311,6 +312,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
               <option value={50}>50 / page</option><option value={200}>200 / page</option><option value={1000}>1000 / page</option>
             </select>
             <a className="btn sm" href={"/api/entries/export?" + filterQS}>Excel / CSV</a>
+            <RowSize />
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
@@ -361,7 +363,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
                 <tr key={r.id}>
                   <td className="date">{d10(r.entry_date)}</td>
                   <td>{r.case_name || <span className="muted">-</span>}</td>
-                  <td>{r.time_entry}{r.url ? <> <a href={r.url} target="_blank" rel="noreferrer" className="small noprint">link</a></> : null}</td>
+                  <td><div className="cellclip">{r.time_entry}</div>{r.url ? <> <a href={r.url} target="_blank" rel="noreferrer" className="small noprint">link</a></> : null}</td>
                   <td className="num">{r.duration === null ? "" : Number(r.duration).toFixed(2)}</td>
                   <td className="who">{r.user_name}</td>
                   <td><Chip v={r.kind} colors={choices[CF.timeKind]} dash={false} /></td>
