@@ -471,3 +471,7 @@ table.data.mini .twist{float:right;padding:0 0 0 6px}
 .viewchip .chip{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:-1px}
 .viewchip .x{display:inline-flex;align-items:center;min-height:28px;border:1px solid var(--line);border-left:none;background:var(--panel);color:var(--muted);border-radius:0 999px 999px 0;padding:0 9px;cursor:pointer;font-size:13px;line-height:1;font-weight:600}
 .chips a.chip{text-decoration:none}
+.casefigures{gap:16px;padding:5px 11px;border:1px solid var(--line);border-radius:var(--rs);background:var(--panel-2)}
+.casefigures .stat b{font-size:15px}
+.casefigures .stat span{font-size:9.5px}
+@media (max-width:820px){.casefigures{width:100%;justify-content:space-between}}

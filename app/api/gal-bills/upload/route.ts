@@ -3,6 +3,7 @@ import { q, ensureSchema } from "../../../../lib/db";
 import { authorize } from "../../../../lib/auth";
 import { parseBill } from "../../../../lib/galbill";
 import { extractLayoutText } from "../../../../lib/pdftext";
+import { xlsxToText } from "../../../../lib/xlsxtext";
 import { fromFilename as payFromName, fromText as payFromText } from "../../../../lib/paymentdoc";
 
 export const runtime = "nodejs";
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
       const out: any = { file: file.name };
       try {
         const buf = new Uint8Array(await file.arrayBuffer());
-        const text = await extractLayoutText(buf);
+        const text = /\.xlsx?$/i.test(file.name) ? xlsxToText(buf) : await extractLayoutText(buf);
 
         // A receipt, not a bill. Proposed rather than saved, so the figure is
         // read by a person before it moves anyone's balance.

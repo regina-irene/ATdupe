@@ -24,7 +24,7 @@ export type Parsed = {
 
 const AMOUNT = /\$\s*(\()?\s*([\d,]+\.\d{2})\)?/g;
 const PAYMENT = /payment\s+from\s+([A-Za-z][A-Za-z']*)\s*[-–]?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i;
-const BALANCE = /([A-Za-z][A-Za-z']*)'s\s+balance/i;
+const BALANCE = /(?:([A-Za-z][A-Za-z']*)'s\s+(?:portion\s+of\s+(?:the\s+)?|share\s+of\s+(?:the\s+)?)?balance|balance\s+(?:due\s+)?(?:from|for)\s+([A-Za-z][A-Za-z']*))/i;
 const TOTAL = /total\s+due\s+from\s+([A-Za-z][A-Za-z']*)/i;
 const SUBTOTAL = /\bsub\s*total\b/i;
 
@@ -63,7 +63,7 @@ export function parseBill(text: string): Parsed {
     labelEnd = -1;
 
     if ((m = line.match(PAYMENT))) { pending = { k: "pay", p: title(m[1]), d: iso(m[2]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
-    else if ((m = line.match(BALANCE))) { pending = { k: "bal", p: title(m[1]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
+    else if ((m = line.match(BALANCE))) { pending = { k: "bal", p: title(m[1] || m[2]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
     else if ((m = line.match(TOTAL))) {
       pending = { k: "tot", p: title(m[1]) };
       labelEnd = (m.index || 0) + m[0].length;

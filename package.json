@@ -12,7 +12,8 @@
     "next": "^15.5.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "unpdf": "^0.12.1"
+    "unpdf": "^0.12.1",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {
     "@types/node": "22.10.5",

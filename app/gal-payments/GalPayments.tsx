@@ -54,8 +54,8 @@ export default function GalPayments() {
   useEffect(() => { load(); }, [load]);
 
   async function upload(files: FileList | File[]) {
-    const list = Array.from(files).filter((f) => /\.pdf$/i.test(f.name));
-    if (!list.length) { setMsg({ kind: "err", text: "Drop PDF bills, not other files." }); return; }
+    const list = Array.from(files).filter((f) => /\.(pdf|xlsx?)$/i.test(f.name));
+    if (!list.length) { setMsg({ kind: "err", text: "Drop PDF or Excel bills." }); return; }
     setBusy(true); setMsg(null);
     try {
       const fd = new FormData();
@@ -239,12 +239,13 @@ export default function GalPayments() {
   }, [rows, q, latestOnly]);
 
   const totals = useMemo(() => {
-    let billed = 0, collected = 0, owing = 0;
+    let fees = 0, billed = 0, collected = 0, owing = 0;
     const seen = new Set<string>();
     for (const r of rows) {
       const k = r.case_name.toLowerCase();
       if (seen.has(k)) continue;
       seen.add(k);
+      fees += Number(r.subtotal || 0);
       for (const [name, p] of Object.entries(r.data?.parties || {})) {
         const due = Number(p.totalDue || 0);
         const later = paid.filter((x) =>
@@ -257,10 +258,35 @@ export default function GalPayments() {
         owing += Math.max(0, due - sum);
       }
     }
-    return { billed, collected, owing, cases: seen.size };
+    return { fees, billed, collected, owing, cases: seen.size };
   }, [rows, paid]);
 
   const partyNames = (b: Bill) => Object.keys(b.data?.parties || {});
+
+  // The bill states some of these and implies the rest. Working them out makes
+  // the column add up instead of jumping from payments to a total due.
+  function account(b: Bill, name: string, p: Party) {
+    const paidOnBill = p.payments.reduce((n, x) => n + Number(x.amount || 0), 0);
+    const laterPaid = since(b, name).reduce((n, x) => n + Number(x.amount || 0), 0);
+
+    // Their share of the fees: from the stated balance where there is one,
+    // otherwise from the stated percentage of the subtotal.
+    let fees: number | null = null;
+    if (p.balance != null) fees = paidOnBill + Number(p.balance);
+    else if (p.share != null && b.subtotal != null) fees = Number(b.subtotal) * Number(p.share) / 100;
+
+    // Positive means they owe, negative is credit sitting on the file.
+    const balance = p.balance != null ? Number(p.balance) : fees != null ? fees - paidOnBill : null;
+
+    const share = p.share != null ? Number(p.share)
+      : fees != null && b.subtotal ? Math.round((fees / Number(b.subtotal)) * 1000) / 10 : null;
+
+    const replenish = p.totalDue != null && balance != null ? Number(p.totalDue) - balance : null;
+    const due = p.totalDue != null ? Number(p.totalDue) : balance != null && balance > 0 ? balance : null;
+    const nowOwing = due != null ? due - laterPaid : null;
+
+    return { paidOnBill, laterPaid, fees, balance, share, replenish, nowOwing, due };
+  }
 
   return (
     <div className="wrap wide">
@@ -270,6 +296,7 @@ export default function GalPayments() {
         <div className="row">
           <div className="stats">
             <div className="stat"><b>{totals.cases}</b><span>Cases</span></div>
+            <div className="stat"><b>{money(totals.fees)}</b><span>Fees incurred</span></div>
             <div className="stat"><b>{money(totals.billed)}</b><span>Requested at billing</span></div>
             <div className="stat"><b>{money(totals.collected)}</b><span>Paid since</span></div>
             <div className="stat"><b className={totals.owing > 0 ? "hot" : "paidoff"}>{money(totals.owing)}</b><span>Still owing</span></div>
@@ -290,11 +317,11 @@ export default function GalPayments() {
               onDragLeave={() => setOver(false)}
               onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files); }}
               onClick={() => document.getElementById("galfiles")?.click()}>
-              <input id="galfiles" type="file" accept="application/pdf" multiple hidden
+              <input id="galfiles" type="file" accept=".pdf,.xlsx,.xls" multiple hidden
                 onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.currentTarget.value = ""; }} />
-              <b>{busy ? "Reading the bills..." : "Drop GAL bills here, or click to choose"}</b>
+              <b>{busy ? "Reading the bills..." : "Drop GAL bills or receipts here, or click to choose"}</b>
               <span className="muted small">
-                Bills and payment receipts together, as many as you like. Everything is read from the file
+                Bills as PDF or Excel, and payment receipts, all together. Everything is read from the file
                 name, so <code>2026.06.05 GAL Billing (Buchanan).pdf</code> and
                 <code>2026.07.20 Payment from Father - $750 (Buchanan GAL).pdf</code> need nothing typed.
               </span>
@@ -389,8 +416,24 @@ export default function GalPayments() {
               <div className="row" style={{ marginBottom: 7 }}>
                 <div>
                   <h2 style={{ margin: 0 }}>{b.case_name}</h2>
-                  <div className="muted small">As of {shortDate(b.bill_date)}{b.subtotal ? " · billed " + money(b.subtotal) : ""}{b.note ? " · " + b.note : ""}</div>
+                  <div className="muted small">As of {shortDate(b.bill_date)}{b.note ? " · " + b.note : ""}</div>
                 </div>
+                <div className="spacer" />
+                {(() => {
+                  const parties = Object.entries(b.data?.parties || {});
+                  const paidAll = parties.reduce((n, [name, p]) =>
+                    n + p.payments.reduce((m, x) => m + Number(x.amount || 0), 0)
+                      + since(b, name).reduce((m, x) => m + Number(x.amount || 0), 0), 0);
+                  const owingAll = parties.reduce((n, [name, p]) =>
+                    n + Math.max(0, Number(p.totalDue || 0) - since(b, name).reduce((m, x) => m + Number(x.amount || 0), 0)), 0);
+                  return (
+                    <div className="stats casefigures">
+                      <div className="stat"><b>{money(b.subtotal)}</b><span>Fees incurred</span></div>
+                      <div className="stat"><b>{money(paidAll)}</b><span>Paid to date</span></div>
+                      <div className="stat"><b className={owingAll > 0.005 ? "hot" : "paidoff"}>{money(owingAll)}</b><span>Still owing</span></div>
+                    </div>
+                  );
+                })()}
                 <div className="spacer" />
                 <button className="btn sm noprint" onClick={() => setPayFor(payFor === b.case_name ? null : b.case_name)}>
                   {payFor === b.case_name ? "Close" : "Record payment"}
@@ -503,7 +546,7 @@ export default function GalPayments() {
               <div className="partycols">
                 {partyNames(b).map((name) => {
                   const p = b.data.parties![name];
-                  const paid = p.payments.reduce((n, x) => n + Number(x.amount || 0), 0);
+                  const ac = account(b, name, p);
                   return (
                     <div className="partycol" data-party={name.trim().toLowerCase()} key={name}>
                       <div className="partyhead">
@@ -511,23 +554,35 @@ export default function GalPayments() {
                         {p.share != null ? <span className="sharepill">{p.share}%</span> : null}
                       </div>
                       <table className="data mini">
-                        <thead><tr><th>Payment date</th><th className="money">Amount</th></tr></thead>
                         <tbody>
+                          {ac.fees != null ? (
+                            <tr className="feerow">
+                              <td>Share of fees{ac.share != null ? ` (${ac.share}%)` : ""}</td>
+                              <td className="money">{money(ac.fees)}</td>
+                            </tr>
+                          ) : null}
                           {p.payments.length === 0 ? (
-                            <tr><td colSpan={2} className="muted">No payments recorded.</td></tr>
+                            <tr><td colSpan={2} className="muted">No payments on this bill.</td></tr>
                           ) : p.payments.map((x, i) => {
                             const isInitial = p.initial != null && Number(x.amount) === Number(p.initial)
                               && p.payments.findIndex((y) => Number(y.amount) === Number(p.initial)) === i;
                             return (
                               <tr key={i}>
-                                <td className="date">{shortDate(x.date)}{isInitial ? <span className="muted small"> · retainer</span> : null}</td>
-                                <td className="money">{money(x.amount)}</td>
+                                <td className="date">Paid {shortDate(x.date)}{isInitial ? <span className="muted small"> · retainer</span> : null}</td>
+                                <td className="money less">({money(x.amount).replace("$", "$")})</td>
                               </tr>
                             );
                           })}
-                          <tr className="sumrow"><td>Paid to date</td><td className="money">{money(paid)}</td></tr>
+                          <tr className="sumrow">
+                            <td>{ac.balance == null ? "Paid to date" : ac.balance < 0 ? "Credit on file" : "Balance owed"}</td>
+                            <td className="money">{ac.balance == null ? money(ac.paidOnBill) : money(Math.abs(ac.balance))}</td>
+                          </tr>
+                          {ac.replenish != null && Math.abs(ac.replenish) > 0.005 ? (
+                            <tr><td>Retainer replenishment</td><td className="money">{money(ac.replenish)}</td></tr>
+                          ) : null}
                         </tbody>
                       </table>
+
                       {since(b, name).length ? (
                         <table className="data mini">
                           <thead><tr><th>Paid since this bill</th><th className="money">Amount</th></tr></thead>
@@ -545,35 +600,20 @@ export default function GalPayments() {
                         </table>
                       ) : null}
                       <div className="partyfoot">
-                        <div><span>Share of fees</span><b>{p.share == null ? "-" : p.share + "%"}</b></div>
                         <div><span>Initial retainer</span><b>{p.initial == null ? "-" : money(p.initial)}</b></div>
-                        {p.share != null && b.subtotal ? (
-                          <div><span>Their share of {money(b.subtotal)}</span><b>{money(Number(b.subtotal) * Number(p.share) / 100)}</b></div>
+                        <div className="due"><span>Due at billing</span><b>{ac.due == null ? "-" : money(ac.due)}</b></div>
+                        {ac.laterPaid ? (
+                          <>
+                            <div><span>Paid since</span><b>{money(ac.laterPaid)}</b></div>
+                            <div className="due">
+                              <span>Now owing</span>
+                              <b className={(ac.nowOwing ?? 0) <= 0.005 ? "paidoff" : ""}>
+                                {(ac.nowOwing ?? 0) <= 0.005 ? "Paid in full" : money(ac.nowOwing)}
+                              </b>
+                            </div>
+                            <div><span>Last payment</span><b>{shortDate(since(b, name).map((x) => x.paid_on).sort().slice(-1)[0])}</b></div>
+                          </>
                         ) : null}
-                        <div><span>Balance</span><b className={p.balance !== null && p.balance > 0 ? "hot" : ""}>
-                          {p.balance === null ? "-" : p.balance < 0 ? money(-p.balance) + " credit" : money(p.balance)}
-                        </b></div>
-                        {p.retainer ? <div><span>Retainer asked</span><b>{money(p.retainer)}</b></div> : null}
-                        <div className="due"><span>Due at billing</span><b>{money(p.totalDue)}</b></div>
-                        {(() => {
-                          const later = since(b, name);
-                          const sum = later.reduce((n, x) => n + Number(x.amount || 0), 0);
-                          if (!later.length) return null;
-                          const left = Number(p.totalDue || 0) - sum;
-                          const last = later.map((x) => x.paid_on).sort().slice(-1)[0];
-                          return (
-                            <>
-                              <div><span>Paid since</span><b>{money(sum)}</b></div>
-                              <div className="due">
-                                <span>Now owing</span>
-                                <b className={left <= 0.005 ? "paidoff" : ""}>
-                                  {left <= 0.005 ? "Paid in full" : money(left)}
-                                </b>
-                              </div>
-                              <div><span>Last payment</span><b>{shortDate(last)}</b></div>
-                            </>
-                          );
-                        })()}
                       </div>
                     </div>
                   );
