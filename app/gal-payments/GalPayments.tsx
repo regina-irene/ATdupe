@@ -18,6 +18,10 @@ const shortDate = (v: string) => {
 
 export default function GalPayments() {
   const [rows, setRows] = useState<Bill[]>([]);
+  const [paid, setPaid] = useState<any[]>([]);
+  const [payFor, setPayFor] = useState<string | null>(null);
+  const [pform, setPform] = useState<any>({ party: "", paid_on: "", amount: "", method: "", note: "" });
+  const [bulk, setBulk] = useState("");
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
   const [q, setQ] = useState("");
@@ -34,9 +38,13 @@ export default function GalPayments() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const j = await (await fetch("/api/gal-bills")).json();
+      const [j, k] = await Promise.all([
+        (await fetch("/api/gal-bills")).json(),
+        (await fetch("/api/gal-payments")).json(),
+      ]);
       if (j.error) throw new Error(j.error);
       setRows(j.rows || []);
+      setPaid(k.rows || []);
     } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
     setLoading(false);
   }, []);
@@ -86,6 +94,58 @@ export default function GalPayments() {
     load();
   }
 
+  async function addPayment(caseName: string) {
+    const body = pform.party && pform.paid_on && pform.amount
+      ? { case_name: caseName, ...pform }
+      : null;
+    if (!body) { setMsg({ kind: "err", text: "A party, a date and an amount are needed." }); return; }
+    const j = await (await fetch("/api/gal-payments", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setPform({ party: "", paid_on: "", amount: "", method: "", note: "" });
+    setMsg({ kind: "ok", text: "Payment recorded." });
+    load();
+  }
+
+  // "Father 6/30/2026 2500 zelle", one per line.
+  async function addBulk(caseName: string) {
+    const payments = bulk.split(/\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
+      const m = l.match(/^([A-Za-z][A-Za-z']*)\s+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+\$?\s*([\d,]+(?:\.\d{2})?)\s*(.*)$/);
+      if (!m) return null;
+      const d = m[2].split(/[\/.-]/);
+      const yr = d[2].length === 2 ? "20" + d[2] : d[2];
+      return {
+        case_name: caseName, party: m[1],
+        paid_on: `${yr}-${d[0].padStart(2, "0")}-${d[1].padStart(2, "0")}`,
+        amount: Number(m[3].replace(/,/g, "")), method: m[4] || null,
+      };
+    }).filter(Boolean);
+    if (!payments.length) { setMsg({ kind: "err", text: "Use: Father 6/30/2026 2500 zelle, one per line." }); return; }
+    const j = await (await fetch("/api/gal-payments", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ payments }),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setBulk("");
+    setMsg({ kind: "ok", text: `Recorded ${j.added} payment${j.added > 1 ? "s" : ""}.` });
+    load();
+  }
+
+  async function dropPayment(id: number) {
+    if (!confirm("Remove this payment?")) return;
+    const j = await (await fetch("/api/gal-payments/" + id, { method: "DELETE" })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    load();
+  }
+
+  // Payments taken after the bill's as-of date, per party.
+  function since(b: Bill, partyName: string) {
+    return paid.filter((p) =>
+      p.case_name.toLowerCase() === b.case_name.toLowerCase() &&
+      String(p.party).toLowerCase() === partyName.toLowerCase() &&
+      p.paid_on > b.bill_date);
+  }
+
   function startEdit(b: Bill) {
     const initials: Record<string, string> = {};
     for (const [n, p] of Object.entries(b.data?.parties || {})) initials[n] = p.initial == null ? "" : String(p.initial);
@@ -124,19 +184,26 @@ export default function GalPayments() {
   }, [rows, q, latestOnly]);
 
   const totals = useMemo(() => {
-    let due = 0, owed = 0;
+    let billed = 0, collected = 0, owing = 0;
     const seen = new Set<string>();
     for (const r of rows) {
       const k = r.case_name.toLowerCase();
       if (seen.has(k)) continue;
       seen.add(k);
-      for (const p of Object.values(r.data?.parties || {})) {
-        if (p.totalDue) due += p.totalDue;
-        if (p.balance !== null && p.balance !== undefined && p.balance > 0) owed += p.balance;
+      for (const [name, p] of Object.entries(r.data?.parties || {})) {
+        const due = Number(p.totalDue || 0);
+        const later = paid.filter((x) =>
+          x.case_name.toLowerCase() === k &&
+          String(x.party).toLowerCase() === name.toLowerCase() &&
+          x.paid_on > r.bill_date);
+        const sum = later.reduce((n, x) => n + Number(x.amount || 0), 0);
+        billed += due;
+        collected += sum;
+        owing += Math.max(0, due - sum);
       }
     }
-    return { due, owed, cases: seen.size };
-  }, [rows]);
+    return { billed, collected, owing, cases: seen.size };
+  }, [rows, paid]);
 
   const partyNames = (b: Bill) => Object.keys(b.data?.parties || {});
 
@@ -148,8 +215,9 @@ export default function GalPayments() {
         <div className="row">
           <div className="stats">
             <div className="stat"><b>{totals.cases}</b><span>Cases</span></div>
-            <div className="stat"><b>{money(totals.due)}</b><span>Total requested</span></div>
-            <div className="stat"><b>{money(totals.owed)}</b><span>Past due</span></div>
+            <div className="stat"><b>{money(totals.billed)}</b><span>Requested at billing</span></div>
+            <div className="stat"><b>{money(totals.collected)}</b><span>Paid since</span></div>
+            <div className="stat"><b className={totals.owing > 0 ? "hot" : "paidoff"}>{money(totals.owing)}</b><span>Still owing</span></div>
           </div>
           <div className="spacer" />
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a case" style={{ width: 160 }} />
@@ -226,9 +294,42 @@ export default function GalPayments() {
                   <div className="muted small">As of {shortDate(b.bill_date)}{b.subtotal ? " · billed " + money(b.subtotal) : ""}{b.note ? " · " + b.note : ""}</div>
                 </div>
                 <div className="spacer" />
+                <button className="btn sm noprint" onClick={() => setPayFor(payFor === b.case_name ? null : b.case_name)}>
+                  {payFor === b.case_name ? "Close" : "Record payment"}
+                </button>
                 <button className="btn ghost sm noprint" onClick={() => startEdit(b)}>Edit</button>
                 <button className="btn ghost sm noprint" onClick={() => remove(b)}>Remove</button>
               </div>
+
+              {payFor === b.case_name ? (
+                <div className="card noprint" data-tone="pay" style={{ marginBottom: 9, boxShadow: "none" }}>
+                  <div className="row" style={{ flexWrap: "wrap", gap: 7 }}>
+                    <div><label className="f">Party</label>
+                      <select value={pform.party} onChange={(e) => setPform({ ...pform, party: e.target.value })} style={{ width: 120 }}>
+                        <option value="">-</option>
+                        {Object.keys(b.data?.parties || {}).map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select></div>
+                    <div><label className="f">Paid on</label>
+                      <input type="date" value={pform.paid_on} style={{ width: 150 }}
+                        onChange={(e) => setPform({ ...pform, paid_on: e.target.value })} /></div>
+                    <div><label className="f">Amount</label>
+                      <input type="number" step="0.01" value={pform.amount} style={{ width: 120 }}
+                        onChange={(e) => setPform({ ...pform, amount: e.target.value })} /></div>
+                    <div><label className="f">How</label>
+                      <input type="text" value={pform.method} style={{ width: 130 }} placeholder="card, Zelle, check"
+                        onChange={(e) => setPform({ ...pform, method: e.target.value })} /></div>
+                    <div style={{ alignSelf: "flex-end" }}>
+                      <button className="btn primary sm" onClick={() => addPayment(b.case_name)}>Add</button>
+                    </div>
+                  </div>
+                  <div className="row" style={{ marginTop: 7, alignItems: "flex-end" }}>
+                    <div style={{ flex: 1 }}><label className="f">Or paste several, one per line</label>
+                      <textarea value={bulk} onChange={(e) => setBulk(e.target.value)} style={{ minHeight: 56 }}
+                        placeholder="Father 6/30/2026 2500 zelle" /></div>
+                    <button className="btn sm" onClick={() => addBulk(b.case_name)}>Add all</button>
+                  </div>
+                </div>
+              ) : null}
 
               {editing === b.id ? (
                 <div className="row noprint" style={{ marginBottom: 9, flexWrap: "wrap", gap: 7 }}>
@@ -275,13 +376,48 @@ export default function GalPayments() {
                           <tr className="sumrow"><td>Paid to date</td><td className="money">{money(paid)}</td></tr>
                         </tbody>
                       </table>
+                      {since(b, name).length ? (
+                        <table className="data mini">
+                          <thead><tr><th>Paid since this bill</th><th className="money">Amount</th></tr></thead>
+                          <tbody>
+                            {since(b, name).map((x) => (
+                              <tr key={x.id}>
+                                <td className="date">{shortDate(x.paid_on)}
+                                  {x.method ? <span className="muted small"> · {x.method}</span> : null}
+                                  <button className="twist noprint" title="Remove" onClick={() => dropPayment(x.id)}>&times;</button>
+                                </td>
+                                <td className="money">{money(x.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : null}
                       <div className="partyfoot">
                         <div><span>Initial retainer</span><b>{p.initial == null ? "-" : money(p.initial)}</b></div>
                         <div><span>Balance</span><b className={p.balance !== null && p.balance > 0 ? "hot" : ""}>
                           {p.balance === null ? "-" : p.balance < 0 ? money(-p.balance) + " credit" : money(p.balance)}
                         </b></div>
                         {p.retainer ? <div><span>Retainer asked</span><b>{money(p.retainer)}</b></div> : null}
-                        <div className="due"><span>Total due</span><b>{money(p.totalDue)}</b></div>
+                        <div className="due"><span>Due at billing</span><b>{money(p.totalDue)}</b></div>
+                        {(() => {
+                          const later = since(b, name);
+                          const sum = later.reduce((n, x) => n + Number(x.amount || 0), 0);
+                          if (!later.length) return null;
+                          const left = Number(p.totalDue || 0) - sum;
+                          const last = later.map((x) => x.paid_on).sort().slice(-1)[0];
+                          return (
+                            <>
+                              <div><span>Paid since</span><b>{money(sum)}</b></div>
+                              <div className="due">
+                                <span>Now owing</span>
+                                <b className={left <= 0.005 ? "paidoff" : ""}>
+                                  {left <= 0.005 ? "Paid in full" : money(left)}
+                                </b>
+                              </div>
+                              <div><span>Last payment</span><b>{shortDate(last)}</b></div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

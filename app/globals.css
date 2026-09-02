@@ -449,3 +449,5 @@ table.data.mini tr.sumrow td{font-weight:800;border-top:1px solid var(--line);ba
 .dropzone.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel));transform:scale(1.005)}
 .dropzone b{font-size:14px}
 .dropzone .small{max-width:520px}
+.paidoff{color:var(--good)!important}
+table.data.mini .twist{float:right;padding:0 0 0 6px}
