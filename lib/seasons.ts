@@ -10,7 +10,7 @@ const SEASONS: Record<number, Season> = {
   6:  { id: "summer",  name: "Early summer",  cast: ["☀️", "🍉", "🕶️", "🏖️", "🐠"] },
   7:  { id: "july",    name: "Fourth of July", cast: ["🎆", "🎇", "🍦", "🗽", "🎈"] },
   8:  { id: "peach",   name: "Georgia summer", cast: ["🍑", "🌻", "🌴", "🍋", "🦩"] },
-  9:  { id: "school",  name: "Back to school", cast: ["🍎", "📚", "✏️", "🍂", "🎒"] },
+  9:  { id: "football", name: "Football season", cast: ["🏈", "🏃", "📣", "🏆", "🎺"] },
   10: { id: "spooky",  name: "Hallowe'en",    cast: ["🎃", "👻", "🦇", "🕸️", "🐈‍⬛"] },
   11: { id: "harvest", name: "Thanksgiving",  cast: ["🦃", "🍁", "🌽", "🥧", "🐿️"] },
   12: { id: "holiday", name: "The holidays",  cast: ["🎄", "🎁", "⛄", "🔔", "🦌"] },

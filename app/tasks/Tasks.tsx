@@ -7,6 +7,7 @@ import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group
 import { Resizer, useColWidths } from "../colwidths";
 import RowSize from "../RowSize";
 import Parade from "../Parade";
+import ParadeControls from "../ParadeControls";
 import { celebrate } from "../celebrate";
 import { seasonFor } from "../../lib/seasons";
 import { CF } from "../../lib/constants";
@@ -245,7 +246,8 @@ export default function Tasks() {
     if (!closing) { load(); return; }
     // Mark it done with a flourish before the list refreshes.
     const el = (e?.target as HTMLElement)?.getBoundingClientRect?.();
-    if (el) celebrate(el.left + el.width / 2, el.top + el.height / 2, seasonFor().cast);
+    const big = ["p0", "p1"].indexOf(prioClass(t.priority)) >= 0;
+    if (el) celebrate(el.left + el.width / 2, el.top + el.height / 2, seasonFor().cast, big);
     setLeaving(t.id);
     setTimeout(() => { setLeaving(null); load(); }, 520);
   }
@@ -393,6 +395,7 @@ export default function Tasks() {
                 </div>
               ) : null}
             </div>
+            <ParadeControls />
             <button className="btn sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>

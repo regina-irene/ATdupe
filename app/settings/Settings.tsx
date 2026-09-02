@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import RowSize from "../RowSize";
 import { ALL_SEASONS, seasonFor } from "../../lib/seasons";
+import { readParade, writeParade } from "../../lib/parade";
 
 const LOOKS = [
   { id: "firm", name: "Firm", blurb: "The current look, tidied. Navy chrome, soft cards, comfortable spacing.", sw: ["#1f3a5f", "#f4f6f9", "#ffffff"] },
@@ -47,8 +48,9 @@ export default function Settings() {
     setAccent(get("efl_accent", "navy"));
     setHex(get("efl_accent_hex", ""));
     try { setHues(JSON.parse(get("efl_hues", "{}"))); } catch {}
-    setParade(get("efl_parade", "1") !== "0");
-    setParadeSeason(get("efl_parade_season", "auto"));
+    const pc = readParade();
+    setParade(pc.on);
+    setParadeSeason(pc.season);
   }, []);
 
   const flash = (t: string) => { setSaved(t); setTimeout(() => setSaved(""), 1600); };
@@ -171,21 +173,22 @@ export default function Settings() {
       <div className="card" data-tone="status">
         <h2>Seasonal parade</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
-          A slow procession along the foot of the Tasks page that changes with the month, and a small
-          send-off when you tick a task done. It hides itself when your system asks for less motion.
+          A slow procession along the foot of the Tasks page that changes with the month, and a send-off
+          when you tick a task done. Size and celebration settings are on the Tasks page itself.
+          It hides itself when your system asks for less motion.
         </p>
         <div className="row">
           <div className="seg">
             {[["1", "On"], ["0", "Off"]].map(([v, lab]) => (
               <button key={v} className={(parade ? "1" : "0") === v ? "on" : ""}
-                onClick={() => { const on = v === "1"; setParade(on); put("efl_parade", on ? "1" : "0"); flash(on ? "Parade on." : "Parade off."); }}>
+                onClick={() => { const on = v === "1"; setParade(on); writeParade({ on }); flash(on ? "Parade on." : "Parade off."); }}>
                 {lab}
               </button>
             ))}
           </div>
           <div><label className="f">Which cast</label>
             <select value={paradeSeason} style={{ width: 190 }}
-              onChange={(e) => { setParadeSeason(e.target.value); put("efl_parade_season", e.target.value); }}>
+              onChange={(e) => { setParadeSeason(e.target.value); writeParade({ season: e.target.value }); }}>
               <option value="auto">Follow the month ({seasonFor().name})</option>
               {ALL_SEASONS.map((x) => <option key={x.id} value={x.id}>{x.name} {x.cast.slice(0, 3).join("")}</option>)}
             </select>
