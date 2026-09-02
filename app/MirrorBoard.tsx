@@ -66,6 +66,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const pickerBox = useRef<HTMLDivElement>(null);
 
   const [editing, setEditing] = useState<number | null>(null);
+  const [cellEdit, setCellEdit] = useState<{ id: number; fid: string } | null>(null);
   const [draft, setDraft] = useState<any>({});
   const [views, setViews] = useState<View[]>([]);
   const [naming, setNaming] = useState(false);
@@ -222,6 +223,53 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
     if (sort === fid) setDir(dir === "asc" ? "desc" : "asc");
     else { setSort(fid); setDir("asc"); }
     setPage(1);
+  }
+
+  // Inline: one field, saved as soon as it changes.
+  async function saveCell(row: Row, f: Field, value: any) {
+    setCellEdit(null);
+    const before = row.data?.[f.id];
+    const same = Array.isArray(before) || Array.isArray(value)
+      ? JSON.stringify(before ?? []) === JSON.stringify(value ?? [])
+      : String(before ?? "") === String(value ?? "");
+    if (same) return;
+    const r = await fetch("/api/mirror/" + boardKey + "/" + row.id, {
+      method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: { [f.id]: value } }),
+    });
+    const j = await r.json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    load();
+  }
+
+  // What a cell turns into once you click it.
+  function inlineCell(f: Field, row: Row) {
+    const v = row.data?.[f.id];
+    const done = (val: any) => saveCell(row, f, val);
+    if (f.type === "singleSelect") return (
+      <select autoFocus defaultValue={v ?? ""} onBlur={() => setCellEdit(null)} onChange={(e) => done(e.target.value)}>
+        <option value="">-</option>
+        {(f.choices || []).map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+      </select>);
+    if (f.type === "multipleSelects") return (
+      <div className="row" style={{ gap: 5 }}>
+        <div style={{ flex: 1 }}>
+          <MultiSelect label="" allLabel="None" options={(f.choices || []).map((c) => c.name)}
+            value={Array.isArray(v) ? v : v ? [v] : []} onChange={(nv) => done(nv)} />
+        </div>
+        <button className="btn ghost sm" onClick={() => setCellEdit(null)}>Done</button>
+      </div>);
+    if (f.type === "date") return (
+      <input type="date" autoFocus defaultValue={v ? String(v).slice(0, 10) : ""}
+        onBlur={() => setCellEdit(null)} onChange={(e) => done(e.target.value)} />);
+    if (f.type === "dateTime") return (
+      <input type="datetime-local" autoFocus defaultValue={v ? String(v).slice(0, 16) : ""}
+        onBlur={() => setCellEdit(null)} onChange={(e) => done(e.target.value)} />);
+    if (NUMY.indexOf(f.type) >= 0) return (
+      <input type="number" step="any" autoFocus defaultValue={v ?? ""} onBlur={(e) => done(e.target.value)} />);
+    if (f.type === "multilineText" || f.type === "richText") return (
+      <textarea autoFocus defaultValue={strip(v)} style={{ minHeight: 90 }} onBlur={(e) => done(e.target.value)} />);
+    return <input type="text" autoFocus defaultValue={v ?? ""} onBlur={(e) => done(e.target.value)} />;
   }
 
   async function save(id: number) {
@@ -542,6 +590,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
               ) : null}
             </div>
             <RowSize />
+            <span className="muted small">Click a cell to change it.</span>
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
@@ -595,7 +644,21 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                 </td></tr>
               ) : (
                 <tr key={r.id}>
-                  {cols.map((f) => <td key={f.id} className="small">{show(f, r.data?.[f.id])}</td>)}
+                  {cols.map((f) => {
+                    const open = cellEdit?.id === r.id && cellEdit.fid === f.id;
+                    if (!f.writable) return <td key={f.id} className="small">{show(f, r.data?.[f.id])}</td>;
+                    // Ticks toggle straight away; everything else opens on click.
+                    if (f.type === "checkbox") return (
+                      <td key={f.id} className="small tick">
+                        <input type="checkbox" checked={!!r.data?.[f.id]}
+                          onChange={(e) => saveCell(r, f, e.target.checked)} />
+                      </td>);
+                    return (
+                      <td key={f.id} className="small edit"
+                        onClick={() => { if (!open) setCellEdit({ id: r.id, fid: f.id }); }}>
+                        {open ? inlineCell(f, r) : show(f, r.data?.[f.id])}
+                      </td>);
+                  })}
                   {linksBoards ? (
                     <td className="noprint">
                       {boardMap[String(r.data?.[primary] ?? "").trim().toLowerCase()]
