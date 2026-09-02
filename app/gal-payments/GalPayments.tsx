@@ -24,12 +24,10 @@ export default function GalPayments() {
   const [latestOnly, setLatestOnly] = useState(true);
 
   const [adding, setAdding] = useState(false);
-  const [text, setText] = useState("");
-  const [caseName, setCaseName] = useState("");
-  const [billDate, setBillDate] = useState("");
-  const [note, setNote] = useState("");
-  const [preview, setPreview] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  const [results, setResults] = useState<any[]>([]);
+  const [fixes, setFixes] = useState<Record<string, { case_name: string; bill_date: string }>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,36 +40,48 @@ export default function GalPayments() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  async function parse() {
-    setBusy(true);
+  async function upload(files: FileList | File[]) {
+    const list = Array.from(files).filter((f) => /\.pdf$/i.test(f.name));
+    if (!list.length) { setMsg({ kind: "err", text: "Drop PDF bills, not other files." }); return; }
+    setBusy(true); setMsg(null);
     try {
-      const j = await (await fetch("/api/gal-bills/parse", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }),
-      })).json();
+      const fd = new FormData();
+      for (const f of list) fd.append("files", f);
+      const j = await (await fetch("/api/gal-bills/upload", { method: "POST", body: fd })).json();
       if (j.error) throw new Error(j.error);
-      setPreview(j.parsed);
-      if (!caseName && j.parsed.caseName) setCaseName(j.parsed.caseName);
-      if (!billDate && j.parsed.billDate) setBillDate(j.parsed.billDate);
-      setMsg(null);
-    } catch (e: any) { setMsg({ kind: "err", text: e.message }); setPreview(null); }
-    setBusy(false);
-  }
-
-  async function save() {
-    if (!preview) { setMsg({ kind: "err", text: "Read the bill first." }); return; }
-    if (!caseName.trim() || !billDate) { setMsg({ kind: "err", text: "A case name and bill date are needed." }); return; }
-    setBusy(true);
-    try {
-      const j = await (await fetch("/api/gal-bills", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ case_name: caseName.trim(), bill_date: billDate, subtotal: preview.subtotal, data: { parties: preview.parties }, note }),
-      })).json();
-      if (j.error) throw new Error(j.error);
-      setMsg({ kind: "ok", text: `Saved ${caseName.trim()} as of ${shortDate(billDate)}.` });
-      setText(""); setPreview(null); setCaseName(""); setBillDate(""); setNote(""); setAdding(false);
+      setResults(j.results || []);
+      const pending: Record<string, { case_name: string; bill_date: string }> = {};
+      for (const r of j.results || []) {
+        if (r.status === "needs-details") pending[r.file] = { case_name: r.case_name || "", bill_date: r.bill_date || "" };
+      }
+      setFixes(pending);
+      const failed = (j.results || []).filter((r: any) => r.status === "failed" || r.status === "no-summary").length;
+      setMsg({
+        kind: failed || Object.keys(pending).length ? "warn" : "ok",
+        text: `Read ${list.length} file${list.length > 1 ? "s" : ""}: ${j.saved} saved`
+          + (Object.keys(pending).length ? `, ${Object.keys(pending).length} need a case name or date` : "")
+          + (failed ? `, ${failed} could not be read` : "") + ".",
+      });
       load();
     } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
     setBusy(false);
+  }
+
+  // For a file whose case or date could not be worked out from its name.
+  async function saveFix(r: any) {
+    const f = fixes[r.file];
+    if (!f?.case_name?.trim() || !f?.bill_date) { setMsg({ kind: "err", text: "Both a case name and a date are needed." }); return; }
+    const j = await (await fetch("/api/gal-bills", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        case_name: f.case_name.trim(), bill_date: f.bill_date,
+        subtotal: r.parsed?.subtotal ?? null, data: { parties: r.parsed?.parties || {} },
+      }),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setResults((cur) => cur.map((x) => (x.file === r.file ? { ...x, status: "saved" } : x)));
+    setMsg({ kind: "ok", text: `Saved ${f.case_name.trim()}.` });
+    load();
   }
 
   async function remove(b: Bill) {
@@ -130,36 +140,53 @@ export default function GalPayments() {
             {latestOnly ? "Latest bill only" : "Every bill"}
           </button>
           <button className="btn sm" onClick={() => window.print()}>Print</button>
-          <button className="btn primary sm" onClick={() => setAdding(!adding)}>{adding ? "Close" : "Add a bill"}</button>
+          <button className="btn primary sm" onClick={() => setAdding(!adding)}>{adding ? "Close" : "Upload bills"}</button>
         </div>
 
         {adding ? (
           <>
-            <div className="grid g4" style={{ marginTop: 11 }}>
-              <div><label className="f">Case</label>
-                <input type="text" value={caseName} onChange={(e) => setCaseName(e.target.value)} placeholder="e.g. Buchanan" /></div>
-              <div><label className="f">Bill date (amounts as of)</label>
-                <input type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} /></div>
-              <div style={{ gridColumn: "span 2" }}><label className="f">Note</label>
-                <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></div>
-            </div>
-            <div style={{ marginTop: 7 }}>
-              <label className="f">Paste the bill</label>
-              <textarea value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 130 }}
-                placeholder="Open the PDF, select all, copy, and paste here. Only the payment summary at the end matters." />
-            </div>
-            <div className="row" style={{ marginTop: 9 }}>
-              <button className="btn sm" disabled={busy} onClick={parse}>{busy ? "Reading..." : "Read the bill"}</button>
-              <button className="btn primary sm" disabled={busy || !preview} onClick={save}>Save</button>
-              <div className="spacer" />
-              <span className="muted small">Saving again for the same case and date replaces that bill.</span>
+            <div className={"dropzone" + (over ? " over" : "")}
+              onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+              onDragLeave={() => setOver(false)}
+              onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files); }}
+              onClick={() => document.getElementById("galfiles")?.click()}>
+              <input id="galfiles" type="file" accept="application/pdf" multiple hidden
+                onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.currentTarget.value = ""; }} />
+              <b>{busy ? "Reading the bills..." : "Drop GAL bills here, or click to choose"}</b>
+              <span className="muted small">
+                PDFs, as many as you like at once. The case and the as-of date come from the file name,
+                so <code>2026.06.05 GAL Billing (Buchanan).pdf</code> needs nothing typed at all.
+              </span>
             </div>
 
-            {preview ? (
-              <div className="draft" style={{ marginTop: 9 }}>
-                <b>Found:</b> subtotal {money(preview.subtotal)} ·{" "}
-                {Object.entries(preview.parties).map(([n, p]: any) => (
-                  <span key={n}>{n}: {p.payments.length} payments, balance {money(p.balance)}, due {money(p.totalDue)}. </span>
+            {results.length ? (
+              <div className="feed" style={{ marginTop: 10 }}>
+                {results.map((r) => (
+                  <div className="feedrow" key={r.file} style={{ cursor: "default", flexWrap: "wrap" }}>
+                    <span className={"tag " + (r.status === "saved" ? "k-task" : r.status === "needs-details" ? "k-docs" : "k-objections")}>
+                      {r.status === "saved" ? "Saved" : r.status === "needs-details" ? "Needs details" : r.status === "no-summary" ? "No summary" : "Failed"}
+                    </span>
+                    <span className="feedmain">
+                      <b>{r.case_name || r.file}</b>
+                      <span className="muted small">
+                        {r.file}
+                        {r.parsed ? " · " + Object.entries(r.parsed.parties || {}).map(([n, p]: any) =>
+                          `${n}: ${p.payments.length} payments, due ${money(p.totalDue)}`).join(" · ") : ""}
+                        {r.why ? " · " + r.why : ""}
+                      </span>
+                    </span>
+                    {r.status === "needs-details" ? (
+                      <span className="row" style={{ width: "100%", marginTop: 6 }}>
+                        <input type="text" placeholder="Case name" value={fixes[r.file]?.case_name || ""}
+                          onChange={(e) => setFixes({ ...fixes, [r.file]: { ...fixes[r.file], case_name: e.target.value } })}
+                          style={{ maxWidth: 220 }} />
+                        <input type="date" value={fixes[r.file]?.bill_date || ""}
+                          onChange={(e) => setFixes({ ...fixes, [r.file]: { ...fixes[r.file], bill_date: e.target.value } })}
+                          style={{ maxWidth: 160 }} />
+                        <button className="btn primary sm" onClick={() => saveFix(r)}>Save</button>
+                      </span>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             ) : null}
@@ -170,7 +197,7 @@ export default function GalPayments() {
       {loading ? <p className="muted">Loading...</p>
         : shown.length === 0 ? (
           <div className="card" data-tone="gal"><p className="muted" style={{ margin: 0 }}>
-            No GAL bills yet. Use <b>Add a bill</b> and paste the first one.
+            No GAL bills yet. Use <b>Upload bills</b> and drop the PDFs in.
           </p></div>
         ) : (
         <div className="galgrid">

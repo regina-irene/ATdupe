@@ -444,3 +444,8 @@ table.data.mini tr.sumrow td{font-weight:800;border-top:1px solid var(--line);ba
 .partyfoot .due b{color:var(--danger)}
 @media (max-width:760px){.partycols{grid-template-columns:1fr}}
 @media print{.galgrid{grid-template-columns:1fr 1fr}.galgrid > .card{break-inside:avoid}}
+.dropzone{margin-top:11px;border:2px dashed var(--line);border-radius:var(--r);padding:26px 16px;text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:5px;align-items:center;transition:.15s;background:var(--panel-2)}
+.dropzone:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--panel))}
+.dropzone.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel));transform:scale(1.005)}
+.dropzone b{font-size:14px}
+.dropzone .small{max-width:520px}

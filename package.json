@@ -2,12 +2,17 @@
   "name": "efl-time-board",
   "private": true,
   "version": "2.0.0",
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
   "dependencies": {
     "@neondatabase/serverless": "0.10.4",
     "next": "^15.5.9",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "unpdf": "^0.12.1"
   },
   "devDependencies": {
     "@types/node": "22.10.5",
