@@ -1,11 +1,11 @@
 import { readParade, SIZE_SCALE } from "./../lib/parade";
 
 // A burst where the task was ticked. Deliberately brief.
-export function celebrate(x: number, y: number, cast: string[], big = false) {
+export function celebrate(x: number, y: number, cast: string[], big = false, always = false) {
   if (typeof window === "undefined") return;
   const cfg = readParade();
   if (!cfg.on || cfg.celebrate === "off") return;
-  if (cfg.celebrate === "priority" && !big) return;
+  if (!always && cfg.celebrate === "priority" && !big) return;
 
   // With reduced motion asked for, mark the moment without throwing things
   // around the screen.

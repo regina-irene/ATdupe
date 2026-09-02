@@ -1,14 +1,20 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { seasonFor, ALL_SEASONS } from "../lib/seasons";
 import { readParade, onParadeChange, SIZE_SCALE, type ParadeSettings } from "../lib/parade";
 import { FOOTBALL_ART } from "./FootballArt";
+import { celebrate } from "./celebrate";
 
 const MAX = 40; // past this the strip is a crowd, not a count
 
-// One walker per open task, so the parade is the size of the pile.
+// One walker per open task. When the count drops, one of them celebrates,
+// which means it fires however the task was cleared.
 export default function Parade({ count, label }: { count?: number; label?: string }) {
   const [cfg, setCfg] = useState<ParadeSettings | null>(null);
+  const [cheer, setCheer] = useState<number | null>(null);
+  const prev = useRef<number | undefined>(undefined);
+  const refs = useRef<Record<number, HTMLSpanElement | null>>({});
+
   const refresh = useCallback(() => setCfg(readParade()), []);
   useEffect(() => { refresh(); return onParadeChange(refresh); }, [refresh]);
 
@@ -29,7 +35,9 @@ export default function Parade({ count, label }: { count?: number; label?: strin
     const spread = Math.max(n, 6);
     return Array.from({ length: n }, (_, i) => ({
       i,
-      Art: art ? art[i % art.length] : null,
+      // Every fifth one is a llama, whatever the month.
+      llama: i > 0 && i % 5 === 0,
+      Art: art && !(i > 0 && i % 5 === 0) ? art[i % art.length] : null,
       ch: season.cast[i % season.cast.length],
       delay: (i * (44 / spread)) % 44,
       dur: 34 + ((i * 7) % 16),
@@ -38,19 +46,37 @@ export default function Parade({ count, label }: { count?: number; label?: strin
     }));
   }, [season, scale, n]);
 
+  // The count going down is the win. Pick someone and let them enjoy it.
+  useEffect(() => {
+    if (count === undefined) return;
+    const before = prev.current;
+    prev.current = count;
+    if (before === undefined || count >= before) return;
+    if (!cfg?.on || cfg.celebrate === "off") return;
+
+    const pick = Math.floor(Math.random() * Math.max(1, Math.min(MAX, count || 1)));
+    setCheer(pick);
+    const el = refs.current[pick];
+    const r = el?.getBoundingClientRect();
+    const cast = season.art === "football" ? ["🏈", "🦙", "📣"] : season.cast;
+    celebrate(r ? r.left + r.width / 2 : window.innerWidth / 2,
+              r ? r.top : window.innerHeight - 90, cast, true, true);
+    const t = setTimeout(() => setCheer(null), 1600);
+    return () => clearTimeout(t);
+  }, [count, cfg, season]);
+
   if (!cfg?.on || n === 0) return null;
   const lane = Math.round(38 * scale) + 16;
-  const title = label
-    ? `${label}: ${count}${(count || 0) > MAX ? ` (showing ${MAX})` : ""}`
-    : season.name;
+  const title = label ? `${label}: ${count}${(count || 0) > MAX ? ` (showing ${MAX})` : ""}` : season.name;
 
   return (
     <div className="parade noprint" aria-hidden="true" title={title} style={{ height: lane }}>
       {walkers.map((w) => (
-        <span key={w.i} className="walker"
+        <span key={w.i} className={"walker" + (cheer === w.i ? " cheering" : "")}
+          ref={(el) => { refs.current[w.i] = el; }}
           style={{ animationDuration: `${w.dur}s`, animationDelay: `-${w.delay}s`, fontSize: w.size }}>
           <span className="bob" style={{ animationDuration: `${w.bob}s` }}>
-            {w.Art ? <w.Art /> : w.ch}
+            {w.llama ? "🦙" : w.Art ? <w.Art /> : w.ch}
           </span>
         </span>
       ))}

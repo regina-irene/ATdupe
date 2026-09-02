@@ -2,19 +2,19 @@
 export type Season = { id: string; name: string; cast: string[]; art?: "football" };
 
 const SEASONS: Record<number, Season> = {
-  1:  { id: "winter",  name: "Deep winter",   cast: ["⛄", "❄️", "🐧", "🧣", "☕"] },
-  2:  { id: "hearts",  name: "Valentines",    cast: ["💗", "💌", "🌹", "🧸", "💘"] },
-  3:  { id: "spring",  name: "St Patrick's",  cast: ["🍀", "🌈", "🌷", "☘️", "🪴"] },
-  4:  { id: "easter",  name: "Easter",        cast: ["🐰", "🌸", "🥚", "🦆", "🌦️"] },
-  5:  { id: "bloom",   name: "Late spring",   cast: ["🌼", "🐝", "🦋", "🌺", "🐞"] },
-  6:  { id: "summer",  name: "Early summer",  cast: ["☀️", "🍉", "🕶️", "🏖️", "🐠"] },
-  7:  { id: "july",    name: "Fourth of July", cast: ["🎆", "🎇", "🍦", "🗽", "🎈"] },
-  8:  { id: "peach",   name: "Georgia summer", cast: ["🍑", "🌻", "🌴", "🍋", "🦩"] },
+  1:  { id: "winter",  name: "Deep winter",   cast: ["⛄", "❄️", "🐧", "🧣", "☕", "🦙"] },
+  2:  { id: "hearts",  name: "Valentines",    cast: ["💗", "💌", "🌹", "🧸", "💘", "🦙"] },
+  3:  { id: "spring",  name: "St Patrick's",  cast: ["🍀", "🌈", "🌷", "☘️", "🪴", "🦙"] },
+  4:  { id: "easter",  name: "Easter",        cast: ["🐰", "🌸", "🥚", "🦆", "🌦️", "🦙"] },
+  5:  { id: "bloom",   name: "Late spring",   cast: ["🌼", "🐝", "🦋", "🌺", "🐞", "🦙"] },
+  6:  { id: "summer",  name: "Early summer",  cast: ["☀️", "🍉", "🕶️", "🏖️", "🐠", "🦙"] },
+  7:  { id: "july",    name: "Fourth of July", cast: ["🎆", "🎇", "🍦", "🗽", "🎈", "🦙"] },
+  8:  { id: "peach",   name: "Georgia summer", cast: ["🍑", "🌻", "🌴", "🍋", "🦩", "🦙"] },
   // Drawn rather than emoji: football, helmet, jersey, goalpost, penalty flag.
   9:  { id: "football", name: "Football season", cast: ["🏈", "🏈", "🏈", "🏈", "🏈"], art: "football" },
-  10: { id: "spooky",  name: "Hallowe'en",    cast: ["🎃", "👻", "🦇", "🕸️", "🐈‍⬛"] },
-  11: { id: "harvest", name: "Thanksgiving",  cast: ["🦃", "🍁", "🌽", "🥧", "🐿️"] },
-  12: { id: "holiday", name: "The holidays",  cast: ["🎄", "🎁", "⛄", "🔔", "🦌"] },
+  10: { id: "spooky",  name: "Hallowe'en",    cast: ["🎃", "👻", "🦇", "🕸️", "🐈‍⬛", "🦙"] },
+  11: { id: "harvest", name: "Thanksgiving",  cast: ["🦃", "🍁", "🌽", "🥧", "🐿️", "🦙"] },
+  12: { id: "holiday", name: "The holidays",  cast: ["🎄", "🎁", "⛄", "🔔", "🦌", "🦙"] },
 };
 
 export function seasonFor(d = new Date()): Season {
