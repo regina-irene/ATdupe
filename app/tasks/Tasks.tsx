@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_USERS, prioClass } from "../../lib/constants";
 import MultiSelect from "../MultiSelect";
 import Chip, { useChoices } from "../Chip";
+import Linkify, { labelFor } from "../Linkify";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { Resizer, useColWidths } from "../colwidths";
 import RowSize from "../RowSize";
@@ -65,6 +66,7 @@ const COLUMNS: { id: string; label: string; width?: number }[] = [
   { id: "status", label: "Status", width: 170 },
   { id: "who", label: "Who", width: 62 },
   { id: "due", label: "Due", width: 88 },
+  { id: "link", label: "Link", width: 130 },
   { id: "modified", label: "Modified", width: 132 },
 ];
 const DEFAULT_ORDER = COLUMNS.map((c) => c.id);
@@ -319,13 +321,13 @@ export default function Tasks() {
     }
     if (f.type === "date") return String(v).slice(0, 10);
     if (f.type === "dateTime" || f.type === "lastModifiedTime" || f.type === "createdTime") return when(v);
-    if (f.type === "url") return <a href={String(v)} target="_blank" rel="noreferrer">link</a>;
+    if (f.type === "url") return <a href={String(v)} target="_blank" rel="noreferrer" className="filelink" title={String(v)}>{labelFor(String(v))}</a>;
     if (f.type === "multipleAttachments") return <span className="muted small">{(v as any[]).length} file(s)</span>;
     if (f.type === "multipleRecordLinks") return <span className="muted small">{(v as any[]).length} linked</span>;
     if (Array.isArray(v)) return <span className="small">{v.map((x: any) => (x && typeof x === "object" ? x.name : x)).join(", ")}</span>;
     if (v && typeof v === "object") return <span className="small">{String(v.name ?? "")}</span>;
     const txt = String(v).replace(/<[^>]*>/g, "");
-    return <div className="cellclip" title={txt.length > 90 ? txt : undefined}>{txt}</div>;
+    return <div className="cellclip" title={txt.length > 90 ? txt : undefined}><Linkify text={txt} /></div>;
   }
 
   function cell(id: string, t: any) {
@@ -343,7 +345,11 @@ export default function Tasks() {
       case "case":
         return <td key={id}>{t.case_name || t.client_name || <span className="muted">-</span>}</td>;
       case "task":
-        return <td key={id}><div className="cellclip">{t.task}</div>{t.link ? <> <a href={t.link} target="_blank" rel="noreferrer" className="small noprint">file</a></> : null}</td>;
+        return <td key={id}><div className="cellclip"><Linkify text={t.task} /></div></td>;
+      case "link":
+        return <td key={id} className="small">{t.link
+          ? <a href={t.link} target="_blank" rel="noreferrer" className="filelink" title={t.link}>{labelFor(t.link)}</a>
+          : <span className="muted">-</span>}</td>;
       case "status":
         return <td key={id} className="small"><Chip v={t.status} colors={choices[CF.taskStatus]} /></td>;
       case "who":

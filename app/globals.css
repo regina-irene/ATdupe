@@ -496,3 +496,6 @@ table.data tr.leaving td{animation:doneout .5s ease forwards}
 }
 @media print{.parade{display:none}}
 .cheer{position:fixed;z-index:200;pointer-events:none;transform:translate(-50%,-140%);background:var(--good);color:#fff;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:3px 9px;border-radius:999px;box-shadow:var(--sh-lg)}
+.filelink{color:var(--accent);text-decoration:none;font-weight:600;border-bottom:1px dotted color-mix(in srgb,var(--accent) 45%,transparent)}
+.filelink:hover{text-decoration:none;border-bottom-style:solid;background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.filelink+.filelink{margin-left:6px}

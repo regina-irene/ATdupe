@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MultiSelect from "./MultiSelect";
 import Chip from "./Chip";
+import Linkify, { labelFor } from "./Linkify";
 import { Resizer, useColWidths } from "./colwidths";
 import RowSize from "./RowSize";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
@@ -273,14 +274,14 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
       return txt;
     }
     if (f.type === "lastModifiedTime" || f.type === "createdTime") return when(v);
-    if (f.type === "url") return <a href={String(v)} target="_blank" rel="noreferrer">link</a>;
+    if (f.type === "url") return <a href={String(v)} target="_blank" rel="noreferrer" className="filelink" title={String(v)}>{labelFor(String(v))}</a>;
     if (f.type === "multipleRecordLinks") return <span className="muted small">{(v as any[]).length} linked</span>;
     if (f.type === "multipleAttachments") return <span className="muted small">{(v as any[]).length} file(s)</span>;
     if (v && typeof v === "object") return <span className="small">{strip(v.name || JSON.stringify(v))}</span>;
     if (Array.isArray(v)) return <span className="small">{v.map((x) => (x && typeof x === "object" ? x.name : x)).join(", ")}</span>;
     if (NUMY.indexOf(f.type) >= 0) return <span className="money">{String(v)}</span>;
     const t = strip(v);
-    return <div className="cellclip" title={t.length > 90 ? t : undefined}>{t}</div>;
+    return <div className="cellclip" title={t.length > 90 ? t : undefined}><Linkify text={t} /></div>;
   }
 
   function input(f: Field, val: any, set: (v: any) => void) {
