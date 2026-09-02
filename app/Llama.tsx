@@ -1,171 +1,195 @@
 "use client";
 import React from "react";
 
-// One llama, dressed for the month. Drawn rather than emoji so it can wear a
-// helmet in September and carry a tree in December.
-const WOOL = "#f4ece0";
-const WOOL_SHADE = "#e2d4c2";
-const LINE = "#8d7b66";
-const NAVY = "#0b2343";
-const ORANGE = "#fb4f14";
+// Front-facing, flat, one solid colour, in the spirit of the Monday llamas:
+// tall neck, long ears, white face patch, four straight legs with pale hooves.
+const HOOF = "#efeae1";
+const INK = "#2b3a2f";
 
-function Base({ blanket, children }: { blanket?: string; children?: React.ReactNode }) {
+const COAT: Record<string, string> = {
+  winter: "#5b8def",
+  hearts: "#f2568e",
+  spring: "#2fb573",
+  easter: "#b58be0",
+  bloom: "#f59fc4",
+  summer: "#37bdd6",
+  july: "#e2574c",
+  peach: "#f79a4d",
+  football: "#fb4f14",
+  spooky: "#f28b30",
+  harvest: "#c2703a",
+  holiday: "#2fae66",
+};
+
+export default function Llama({ season, coat }: { season: string; coat?: string }) {
+  const c = coat || COAT[season] || "#7bc47f";
+  const kit = KIT[season];
+
   return (
-    <svg viewBox="0 0 64 64" width="1em" height="1em" style={{ display: "block", overflow: "visible" }}>
+    <svg viewBox="0 0 64 96" width="1em" height="1em" style={{ display: "block", overflow: "visible" }}>
       {/* legs */}
-      <g stroke={LINE} strokeWidth="1" fill={WOOL_SHADE}>
-        <rect x="20" y="40" width="5" height="15" rx="2.4" />
-        <rect x="38" y="40" width="5" height="15" rx="2.4" />
-        <rect x="26" y="41" width="5" height="14" rx="2.4" fill={WOOL} />
-        <rect x="44" y="41" width="5" height="14" rx="2.4" fill={WOOL} />
+      <g fill={c}>
+        <rect x="14" y="68" width="7.5" height="24" rx="3.6" />
+        <rect x="23.5" y="68" width="7.5" height="24" rx="3.6" />
+        <rect x="33" y="68" width="7.5" height="24" rx="3.6" />
+        <rect x="42.5" y="68" width="7.5" height="24" rx="3.6" />
       </g>
-      {/* tail */}
-      <circle cx="17" cy="32" r="4" fill={WOOL} stroke={LINE} strokeWidth="1" />
+      <g fill={HOOF}>
+        <rect x="14" y="85" width="7.5" height="7" rx="3" />
+        <rect x="23.5" y="85" width="7.5" height="7" rx="3" />
+        <rect x="33" y="85" width="7.5" height="7" rx="3" />
+        <rect x="42.5" y="85" width="7.5" height="7" rx="3" />
+      </g>
+
       {/* body */}
-      <rect x="17" y="26" width="34" height="18" rx="9" fill={WOOL} stroke={LINE} strokeWidth="1.2" />
-      {blanket ? <path d="M25 27h16a9 9 0 0 1 0 8H25z" fill={blanket} opacity="0.95" /> : null}
+      <rect x="10" y="42" width="44" height="32" rx="15" fill={c} />
+
       {/* neck */}
-      <path d="M44 40V20a6 6 0 0 1 12 0v20z" fill={WOOL} stroke={LINE} strokeWidth="1.2" />
-      {/* head */}
-      <ellipse cx="52" cy="16" rx="8.5" ry="6.5" fill={WOOL} stroke={LINE} strokeWidth="1.2" />
-      <ellipse cx="58.5" cy="18" rx="3.6" ry="3" fill={WOOL_SHADE} stroke={LINE} strokeWidth="1" />
-      <circle cx="60" cy="17.4" r="0.8" fill={LINE} />
+      <rect x="24.5" y="14" width="15" height="34" rx="7.5" fill={c} />
+
       {/* ears */}
-      <path d="M47 11l-1.5-7 5 4z" fill={WOOL} stroke={LINE} strokeWidth="1" strokeLinejoin="round" />
-      <path d="M54 10l1-7 3.5 5z" fill={WOOL} stroke={LINE} strokeWidth="1" strokeLinejoin="round" />
-      {/* eye */}
-      <circle cx="53.5" cy="14.5" r="1.5" fill="#3a2f22" />
-      <circle cx="54" cy="14" r="0.5" fill="#fff" />
-      {children}
+      <g fill={c}>
+        <rect x="22.5" y="-2" width="6.5" height="15" rx="3.2" transform="rotate(-10 25.7 5.5)" />
+        <rect x="35" y="-2" width="6.5" height="15" rx="3.2" transform="rotate(10 38.2 5.5)" />
+      </g>
+
+      {/* head */}
+      <rect x="21.5" y="6" width="21" height="21" rx="9.5" fill={c} />
+
+      {/* face */}
+      <rect x="26" y="10" width="12" height="15" rx="6" fill="#fff" />
+      <circle cx="29.4" cy="16" r="1.7" fill={INK} />
+      <circle cx="34.6" cy="16" r="1.7" fill={INK} />
+      <path d="M30.6 20.4h2.8" stroke={INK} strokeWidth="1.5" strokeLinecap="round" />
+
+      {kit || null}
     </svg>
   );
 }
 
 const KIT: Record<string, React.ReactNode> = {
-  // September: helmet with a facemask, and a jersey on the back.
+  // September: helmet and facemask, jersey number on the body.
   football: (
     <g>
-      <path d="M44 13a8.5 8.5 0 0 1 17 0v3a1.6 1.6 0 0 1-1.6 1.6h-3l-.8-4H45.6A1.6 1.6 0 0 1 44 12z" fill={NAVY} />
-      <path d="M46.5 9.5a7 7 0 0 1 11 1.2" stroke="#fff" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-      <path d="M56 18c2.4 0 4.4-1.1 5.2-2.9M55 20.6c2.9 0 5.3-1.3 6.3-3.2" stroke={ORANGE} strokeWidth="1.7" fill="none" strokeLinecap="round" />
-      <path d="M61.2 15v5" stroke={ORANGE} strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M20 14a12 12 0 0 1 24 0v5H20z" fill="#0b2343" />
+      <path d="M20 17h24v3.5H20z" fill="#0b2343" />
+      <path d="M24 21v6M32 21v6M40 21v6" stroke="#fb4f14" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M23 27h18" stroke="#fb4f14" strokeWidth="1.7" strokeLinecap="round" />
+      <text x="32" y="63" textAnchor="middle" fontSize="15" fontWeight="800" fill="#0b2343"
+        fontFamily="system-ui, sans-serif">7</text>
     </g>
   ),
-  // December: a tree strapped on.
   holiday: (
     <g>
-      <path d="M26 27l-6 0 4-6-4 0 5-7 5 7-4 0 4 6z" fill="#2f7d43" stroke="#1f5a2f" strokeWidth="0.9" strokeLinejoin="round" transform="translate(4,-4)" />
-      <rect x="28" y="22" width="3" height="4" fill="#7b4a25" />
-      <circle cx="29" cy="12" r="1.4" fill="#f5c518" />
-      <path d="M45 12a7 7 0 0 1 13 1l-1 3H46z" fill="#c0392b" />
-      <path d="M44 15.5h14v3H44z" fill="#fff" rx="1" />
-      <circle cx="43" cy="17" r="2.6" fill="#fff" />
+      <path d="M19 12a13 13 0 0 1 26 0z" fill="#c0392b" />
+      <rect x="17" y="10" width="30" height="5" rx="2.5" fill="#fff" />
+      <circle cx="46" cy="8" r="4" fill="#fff" />
+      <g transform="translate(46,40)">
+        <path d="M6 22H-6l4-7h-3l4-7h-2l3-6 3 6h-2l4 7H2z" fill="#1f7a44" />
+        <rect x="-1.6" y="22" width="3.2" height="5" fill="#7b4a25" />
+        <circle cx="0" cy="2" r="1.7" fill="#f5c518" />
+      </g>
     </g>
   ),
   spooky: (
     <g>
-      <path d="M52 8l-6 3h13z" fill="#4c1d95" />
-      <path d="M52 8l-2.5-8 8 5z" fill="#4c1d95" />
-      <path d="M45.5 10.5h13v2h-13z" fill="#f59e0b" />
-      <circle cx="26" cy="24" r="6" fill="#f97316" stroke="#c2410c" strokeWidth="1" />
-      <path d="M26 18v-3" stroke="#3f6212" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M14 14h36l-18-16z" fill="#4c1d95" />
+      <rect x="12" y="13" width="40" height="4" rx="2" fill="#4c1d95" />
+      <rect x="24" y="9" width="16" height="3" fill="#f59e0b" />
+      <g transform="translate(48,52)">
+        <circle r="9" fill="#f97316" />
+        <path d="M0-9v-4" stroke="#3f6212" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M-4-2l2 3-2 3M4-2l-2 3 2 3" stroke="#7c2d12" strokeWidth="1.4" fill="none" />
+      </g>
     </g>
   ),
   harvest: (
     <g>
-      <rect x="45" y="4" width="13" height="7" rx="1" fill="#3f3f46" />
-      <rect x="42" y="10" width="19" height="2.6" rx="1" fill="#3f3f46" />
-      <rect x="45" y="7" width="13" height="2.4" fill="#f5c518" />
-      <ellipse cx="27" cy="24" rx="7" ry="3" fill="#e8b96a" stroke="#b07d33" strokeWidth="1" />
+      <rect x="22" y="-2" width="20" height="12" rx="1.5" fill="#3f3f46" />
+      <rect x="16" y="9" width="32" height="4" rx="2" fill="#3f3f46" />
+      <rect x="22" y="4" width="20" height="4" fill="#f5c518" />
+      <g transform="translate(49,55)">
+        <ellipse rx="10" ry="4.5" fill="#e8b96a" />
+        <ellipse cy="-2.5" rx="8" ry="3.5" fill="#f5d69a" />
+      </g>
     </g>
   ),
   winter: (
     <g>
-      <path d="M44 22h13v4H44z" fill="#c0392b" />
-      <path d="M45 26l-3 8 4 1 2-8z" fill="#c0392b" />
-      <path d="M44 23.5h13M44 25h13" stroke="#fff" strokeWidth="0.7" />
-      <path d="M46 6h11l-1.5 5h-8z" fill="#2563eb" />
-      <circle cx="51.5" cy="4.5" r="2.4" fill="#fff" />
+      <path d="M20 12a12 12 0 0 1 24 0z" fill="#1d4ed8" />
+      <rect x="18" y="10" width="28" height="4.5" rx="2.2" fill="#fff" />
+      <circle cx="32" cy="-3" r="4.5" fill="#fff" />
+      <path d="M22 34h20v7H22z" fill="#c0392b" />
+      <path d="M40 41l5 14-6 1-3-14z" fill="#c0392b" />
+      <path d="M22 36h20M22 38.5h20" stroke="#fff" strokeWidth="1.1" />
     </g>
   ),
   hearts: (
     <g>
-      <path d="M26 20c0-2.2 1.8-4 4-4 1.4 0 2.6.7 3.3 1.8.7-1.1 1.9-1.8 3.3-1.8 2.2 0 4 1.8 4 4 0 4.4-7.3 8-7.3 8S26 24.4 26 20z" fill="#e11d48" transform="translate(-2,-6) scale(.8)" />
-      <path d="M46 9h12v2H46z" fill="#e11d48" />
-      <circle cx="52" cy="6" r="3" fill="#e11d48" />
+      <path d="M32 2c0-3 2.4-5.4 5.4-5.4 1.9 0 3.5 1 4.4 2.4.9-1.4 2.5-2.4 4.4-2.4C49.2-3.4 51.6-1 51.6 2c0 6-9.8 11-9.8 11S32 8 32 2z"
+        fill="#e11d48" transform="translate(-10,-2) scale(.72)" />
+      <rect x="21" y="10" width="22" height="3.4" rx="1.7" fill="#e11d48" />
     </g>
   ),
   spring: (
     <g>
-      <rect x="45" y="5" width="13" height="6" rx="1" fill="#15803d" />
-      <rect x="42" y="10" width="19" height="2.4" rx="1" fill="#15803d" />
-      <rect x="45" y="8" width="13" height="2" fill="#f5c518" />
-      <circle cx="26" cy="23" r="2.2" fill="#22c55e" />
-      <circle cx="29" cy="21" r="2.2" fill="#22c55e" />
-      <circle cx="23" cy="21" r="2.2" fill="#22c55e" />
+      <rect x="22" y="-2" width="20" height="11" rx="1.5" fill="#15803d" />
+      <rect x="16" y="8" width="32" height="4" rx="2" fill="#15803d" />
+      <rect x="22" y="3.5" width="20" height="3.4" fill="#f5c518" />
+      <g transform="translate(48,54)" fill="#22c55e">
+        <circle cx="0" cy="-4" r="3.4" /><circle cx="-4" cy="1" r="3.4" />
+        <circle cx="4" cy="1" r="3.4" /><circle cx="0" cy="5" r="2.4" />
+      </g>
     </g>
   ),
   easter: (
-    <g>
-      <path d="M47 10c-1-6 0-10 1.5-10S51 4 50.5 10z" fill="#fff" stroke="#e5b8c8" strokeWidth="1" />
-      <path d="M55 9c-.5-6 .8-10 2.3-9.6S59 4 58.5 9z" fill="#fff" stroke="#e5b8c8" strokeWidth="1" />
-      <ellipse cx="27" cy="23" rx="5" ry="6.5" fill="#a7f3d0" stroke="#4bb99a" strokeWidth="1" />
-      <path d="M22 23h10M22 26h10" stroke="#f472b6" strokeWidth="1.4" />
+    <g fill="#fff" stroke="#e9c4d6" strokeWidth="1.2">
+      <ellipse cx="25" cy="0" rx="4" ry="11" transform="rotate(-10 25 0)" />
+      <ellipse cx="39" cy="0" rx="4" ry="11" transform="rotate(10 39 0)" />
+      <g stroke="none">
+        <ellipse cx="49" cy="55" rx="7" ry="9" fill="#a7f3d0" />
+        <path d="M42 53h14M42 58h14" stroke="#f472b6" strokeWidth="2" />
+      </g>
     </g>
   ),
   bloom: (
     <g>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <circle key={i} cx={46 + i * 3.2} cy={9 - (i % 2) * 1.6} r="2.3"
-          fill={["#f472b6", "#facc15", "#fb923c", "#f472b6", "#facc15"][i]} />
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <circle key={i} cx={20 + i * 4.8} cy={9 - (i % 2) * 2} r="3.1"
+          fill={["#f472b6", "#facc15", "#fb923c", "#f472b6", "#facc15", "#fb923c"][i]} />
       ))}
-      <circle cx="27" cy="22" r="3" fill="#facc15" />
-      <circle cx="27" cy="22" r="1.2" fill="#a16207" />
+      <g transform="translate(49,55)">
+        <circle r="5.5" fill="#facc15" /><circle r="2.2" fill="#a16207" />
+      </g>
     </g>
   ),
   summer: (
     <g>
-      <path d="M46 13h11v3.4H46z" fill="#1f2937" />
-      <circle cx="48.5" cy="14.7" r="3" fill="#111827" />
-      <circle cx="56" cy="14.7" r="3" fill="#111827" />
-      <ellipse cx="34" cy="35" rx="20" ry="8" fill="none" stroke="#38bdf8" strokeWidth="3.4" opacity=".9" />
+      <rect x="24" y="13" width="16" height="5" rx="1.4" fill="#1f2937" />
+      <circle cx="28.4" cy="15.5" r="3.4" fill="#111827" />
+      <circle cx="35.6" cy="15.5" r="3.4" fill="#111827" />
+      <ellipse cx="32" cy="60" rx="27" ry="10" fill="none" stroke="#f97316" strokeWidth="5" opacity=".92" />
     </g>
   ),
   july: (
     <g>
-      <rect x="45" y="4" width="13" height="7" rx="1" fill="#1e3a8a" />
-      <rect x="42" y="10" width="19" height="2.6" rx="1" fill="#b91c1c" />
-      <rect x="45" y="7.4" width="13" height="2" fill="#fff" />
-      <path d="M24 24V12" stroke="#7b4a25" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M24.8 12h9v6h-9z" fill="#b91c1c" />
-      <path d="M24.8 12h4v3h-4z" fill="#1e3a8a" />
+      <rect x="22" y="-2" width="20" height="11" rx="1.5" fill="#1e3a8a" />
+      <rect x="16" y="8" width="32" height="4" rx="2" fill="#b91c1c" />
+      <rect x="22" y="3.2" width="20" height="3.4" fill="#fff" />
+      <path d="M50 62V38" stroke="#7b4a25" strokeWidth="2.2" strokeLinecap="round" />
+      <rect x="50" y="38" width="13" height="9" fill="#b91c1c" />
+      <rect x="50" y="38" width="6" height="5" fill="#1e3a8a" />
     </g>
   ),
   peach: (
     <g>
-      <ellipse cx="52" cy="9" rx="10" ry="3" fill="#e8d5a3" />
-      <ellipse cx="52" cy="7.5" rx="6" ry="3.4" fill="#e8d5a3" stroke="#c4a86b" strokeWidth="0.9" />
-      <path d="M46 9h12" stroke="#c0392b" strokeWidth="1.6" />
-      <circle cx="27" cy="23" r="5.4" fill="#fb923c" stroke="#c2410c" strokeWidth="1" />
-      <path d="M27 17.6c1.4-2 3.4-2.4 4.6-2" stroke="#3f6212" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      <ellipse cx="32" cy="10" rx="18" ry="4.5" fill="#e8d5a3" />
+      <ellipse cx="32" cy="6.5" rx="11" ry="6" fill="#e8d5a3" />
+      <rect x="21" y="8" width="22" height="3.4" fill="#c0392b" />
+      <g transform="translate(49,55)">
+        <circle r="8" fill="#fb923c" />
+        <path d="M0-8c2-3 5-3.6 7-3" stroke="#3f6212" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+      </g>
     </g>
   ),
 };
-
-export default function Llama({ season }: { season: string }) {
-  const blanket =
-    season === "football" ? ORANGE :
-    season === "holiday" ? "#c0392b" :
-    season === "spooky" ? "#7c3aed" :
-    season === "hearts" ? "#f472b6" :
-    season === "spring" ? "#16a34a" :
-    season === "july" ? "#1e3a8a" :
-    season === "winter" ? "#2563eb" :
-    season === "peach" ? "#fb923c" :
-    season === "harvest" ? "#b45309" :
-    season === "bloom" ? "#f472b6" :
-    season === "easter" ? "#a7f3d0" :
-    season === "summer" ? "#38bdf8" : undefined;
-
-  return <Base blanket={blanket}>{KIT[season] || null}</Base>;
-}

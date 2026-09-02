@@ -70,7 +70,7 @@ export default function ParadeControls() {
             One walker per open RIE task, so the parade thins out as you clear the board.
             Clearing anything counts, so this is set to every one.
           </p>
-          <div style={{ fontSize: 30, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <div style={{ fontSize: 46, marginTop: 10, display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 10 }}>
             <Llama season={(ALL_SEASONS.find((x) => x.id === cfg.season) || seasonFor()).id} />
             <span style={{ fontSize: 18 }}>{cast.slice(0, 4).join(" ")}</span>
           </div>

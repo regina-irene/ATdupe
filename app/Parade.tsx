@@ -44,7 +44,7 @@ export default function Parade({ count, label }: { count?: number; label?: strin
         ch: season.cast[i % season.cast.length],
         delay: (i * (44 / spread)) % 44,
         dur: 34 + ((i * 7) % 16),
-        size: Math.round((isLlama ? 30 : 22 + ((i * 5) % 12)) * scale),
+        size: Math.round((isLlama ? 34 : 20 + ((i * 4) % 10)) * scale),
         bob: 0.7 + ((i % 4) * 0.22),
       };
     });
@@ -70,7 +70,7 @@ export default function Parade({ count, label }: { count?: number; label?: strin
   }, [count, cfg, season]);
 
   if (!cfg?.on || n === 0) return null;
-  const lane = Math.round(38 * scale) + 16;
+  const lane = Math.round(56 * scale) + 12;  // the llamas stand tall
   const title = label ? `${label}: ${count}${(count || 0) > MAX ? ` (showing ${MAX})` : ""}` : season.name;
 
   return (
