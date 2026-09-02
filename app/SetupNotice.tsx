@@ -4,7 +4,7 @@ export default function SetupNotice({ missing }: { missing: string[] }) {
       <div className="topbar"><div className="brand">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/efl-logo.png" alt="Edwards Family Law" className="logo" width={26} height={26} />
-        EFL Board
+        Chambers
       </div><nav /></div>
       <div className="pagebar" />
       <div className="wrap narrow"><div className="card" data-tone="status">

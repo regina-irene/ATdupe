@@ -57,7 +57,7 @@ export default function Nav({ name }: { name?: string }) {
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/efl-logo.png" alt="Edwards Family Law" className="logo" width={26} height={26} />
-          EFL Board
+          Chambers
         </div>
         <nav>
           {top("/dashboard", "Dashboard", "dashboard")}

@@ -1,6 +1,7 @@
-# EFL Board
+# Chambers
 
-Time, tasks, payments, cases and clients for Edwards Family Law, mirroring the Airtable base.
+Where Edwards Family Law runs. Time, tasks, payments, case status, clients, per-matter client boards
+and the GAL sheet, mirroring the Airtable base with two-way sync.
 Next.js App Router, deployed on Vercel, data in Neon Postgres, two-way sync with Airtable.
 
 ## Pages

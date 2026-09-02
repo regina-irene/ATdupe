@@ -1,1 +1,1 @@
-{"name": "EFL Board", "short_name": "EFL Board", "start_url": "/", "display": "standalone", "background_color": "#ffffff", "theme_color": "#1f3a5f", "icons": [{"src": "/efl-logo.png", "sizes": "626x626", "type": "image/png", "purpose": "any"}]}
+{"name": "Chambers", "short_name": "Chambers", "start_url": "/", "display": "standalone", "background_color": "#ffffff", "theme_color": "#1f3a5f", "icons": [{"src": "/efl-logo.png", "sizes": "626x626", "type": "image/png", "purpose": "any"}]}
