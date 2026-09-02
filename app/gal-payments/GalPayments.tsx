@@ -496,7 +496,7 @@ export default function GalPayments() {
                   const p = b.data.parties![name];
                   const paid = p.payments.reduce((n, x) => n + Number(x.amount || 0), 0);
                   return (
-                    <div className="partycol" key={name}>
+                    <div className="partycol" data-party={name.trim().toLowerCase()} key={name}>
                       <div className="partyhead">{name}</div>
                       <table className="data mini">
                         <thead><tr><th>Payment date</th><th className="money">Amount</th></tr></thead>

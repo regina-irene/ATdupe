@@ -451,3 +451,17 @@ table.data.mini tr.sumrow td{font-weight:800;border-top:1px solid var(--line);ba
 .dropzone .small{max-width:520px}
 .paidoff{color:var(--good)!important}
 table.data.mini .twist{float:right;padding:0 0 0 6px}
+/* Father blue, Mother pink, matching the billing workbooks. */
+.partycol[data-party=father]{--pty:#2563eb;border-color:color-mix(in srgb,var(--pty) 32%,var(--line));background:color-mix(in srgb,var(--pty) 5%,var(--panel))}
+.partycol[data-party=mother]{--pty:#db2777;border-color:color-mix(in srgb,var(--pty) 32%,var(--line));background:color-mix(in srgb,var(--pty) 5%,var(--panel))}
+.partycol[data-party=father] .partyhead,
+.partycol[data-party=mother] .partyhead{background:color-mix(in srgb,var(--pty) 14%,var(--panel));color:var(--pty);border-bottom-color:color-mix(in srgb,var(--pty) 28%,var(--line))}
+.partycol[data-party] table.data.mini th{background:color-mix(in srgb,var(--pty) 8%,var(--panel))}
+.partycol[data-party] table.data.mini tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--pty) 4%,transparent)}
+.partycol[data-party] table.data.mini tbody tr:hover td{background:color-mix(in srgb,var(--pty) 10%,transparent)}
+.partycol[data-party] tr.sumrow td{background:color-mix(in srgb,var(--pty) 11%,var(--panel))}
+.partycol[data-party] .partyfoot{border-top-color:color-mix(in srgb,var(--pty) 26%,var(--line))}
+:root[data-mode=dark] .partycol[data-party=father]{--pty:#60a5fa}
+:root[data-mode=dark] .partycol[data-party=mother]{--pty:#f472b6}
+:root[data-mode=dark] .partycol[data-party]{background:color-mix(in srgb,var(--pty) 9%,var(--panel))}
+@media print{.partycol[data-party]{background:color-mix(in srgb,var(--pty) 8%,#fff)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
