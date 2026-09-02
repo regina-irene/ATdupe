@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Party = { payments: { date: string; amount: number }[]; balance: number | null; totalDue: number | null; retainer: number | null };
+type Party = { payments: { date: string; amount: number }[]; balance: number | null; totalDue: number | null; retainer?: number | null; initial?: number | null };
 type Bill = {
   id: number; case_name: string; bill_date: string; subtotal: number | null;
   data: { parties?: Record<string, Party> }; note: string | null; updated_by: string | null;
@@ -28,6 +28,8 @@ export default function GalPayments() {
   const [over, setOver] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [fixes, setFixes] = useState<Record<string, { case_name: string; bill_date: string }>>({});
+  const [editing, setEditing] = useState<number | null>(null);
+  const [draft, setDraft] = useState<any>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,6 +84,21 @@ export default function GalPayments() {
     setResults((cur) => cur.map((x) => (x.file === r.file ? { ...x, status: "saved" } : x)));
     setMsg({ kind: "ok", text: `Saved ${f.case_name.trim()}.` });
     load();
+  }
+
+  function startEdit(b: Bill) {
+    const initials: Record<string, string> = {};
+    for (const [n, p] of Object.entries(b.data?.parties || {})) initials[n] = p.initial == null ? "" : String(p.initial);
+    setDraft({ case_name: b.case_name, bill_date: b.bill_date, initials });
+    setEditing(b.id);
+  }
+  async function saveEdit(b: Bill) {
+    const j = await (await fetch("/api/gal-bills/" + b.id, {
+      method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ case_name: draft.case_name, bill_date: draft.bill_date, initials: draft.initials }),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setEditing(null); load();
   }
 
   async function remove(b: Bill) {
@@ -209,8 +226,29 @@ export default function GalPayments() {
                   <div className="muted small">As of {shortDate(b.bill_date)}{b.subtotal ? " · billed " + money(b.subtotal) : ""}{b.note ? " · " + b.note : ""}</div>
                 </div>
                 <div className="spacer" />
+                <button className="btn ghost sm noprint" onClick={() => startEdit(b)}>Edit</button>
                 <button className="btn ghost sm noprint" onClick={() => remove(b)}>Remove</button>
               </div>
+
+              {editing === b.id ? (
+                <div className="row noprint" style={{ marginBottom: 9, flexWrap: "wrap", gap: 7 }}>
+                  <div><label className="f">Case</label>
+                    <input type="text" value={draft.case_name || ""} style={{ width: 170 }}
+                      onChange={(e) => setDraft({ ...draft, case_name: e.target.value })} /></div>
+                  <div><label className="f">As of</label>
+                    <input type="date" value={draft.bill_date || ""} style={{ width: 150 }}
+                      onChange={(e) => setDraft({ ...draft, bill_date: e.target.value })} /></div>
+                  {Object.keys(b.data?.parties || {}).map((n) => (
+                    <div key={n}><label className="f">{n} initial retainer</label>
+                      <input type="number" step="0.01" style={{ width: 130 }} value={draft.initials?.[n] ?? ""}
+                        onChange={(e) => setDraft({ ...draft, initials: { ...draft.initials, [n]: e.target.value } })} /></div>
+                  ))}
+                  <div style={{ alignSelf: "flex-end" }}>
+                    <button className="btn primary sm" onClick={() => saveEdit(b)}>Save</button>
+                    <button className="btn ghost sm" onClick={() => setEditing(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="partycols">
                 {partyNames(b).map((name) => {
@@ -224,13 +262,21 @@ export default function GalPayments() {
                         <tbody>
                           {p.payments.length === 0 ? (
                             <tr><td colSpan={2} className="muted">No payments recorded.</td></tr>
-                          ) : p.payments.map((x, i) => (
-                            <tr key={i}><td className="date">{shortDate(x.date)}</td><td className="money">{money(x.amount)}</td></tr>
-                          ))}
+                          ) : p.payments.map((x, i) => {
+                            const isInitial = p.initial != null && Number(x.amount) === Number(p.initial)
+                              && p.payments.findIndex((y) => Number(y.amount) === Number(p.initial)) === i;
+                            return (
+                              <tr key={i}>
+                                <td className="date">{shortDate(x.date)}{isInitial ? <span className="muted small"> · retainer</span> : null}</td>
+                                <td className="money">{money(x.amount)}</td>
+                              </tr>
+                            );
+                          })}
                           <tr className="sumrow"><td>Paid to date</td><td className="money">{money(paid)}</td></tr>
                         </tbody>
                       </table>
                       <div className="partyfoot">
+                        <div><span>Initial retainer</span><b>{p.initial == null ? "-" : money(p.initial)}</b></div>
                         <div><span>Balance</span><b className={p.balance !== null && p.balance > 0 ? "hot" : ""}>
                           {p.balance === null ? "-" : p.balance < 0 ? money(-p.balance) + " credit" : money(p.balance)}
                         </b></div>

@@ -1,65 +1,110 @@
-// Pulls the payment summary off the end of a GAL bill. Written against the
-// real layout: payments, each party's balance, and the total due including the
-// retainer replenishment.
+// Reads the payment summary off the end of a GAL bill.
+//
+// The bills are not laid out consistently: some print the amount on the same
+// line as its label, others on the line below; some use "Payment from Father",
+// others "PAYMENT FROM FATHER"; some carry a balance line, some do not; the
+// retainer is sometimes a sum and sometimes a percentage. So rather than match
+// whole lines, this walks the summary pairing each label with the next amount
+// that follows it.
 export type Party = {
   payments: { date: string; amount: number }[];
-  balance: number | null;      // negative in the bill means credit remaining
+  balance: number | null;    // negative means credit remaining
   totalDue: number | null;
-  retainer: number | null;
+  initial?: number | null;   // the retainer paid at the outset
 };
 export type Parsed = {
   parties: Record<string, Party>;
   subtotal: number | null;
+  retainer: number | null;       // when the bill names a sum
+  retainerNote: string | null;   // when it names a percentage
   caseName: string | null;
   billDate: string | null;
 };
 
-const num = (s: string) => Number(String(s).replace(/[,$\s]/g, ""));
-const iso = (d: string) => {
-  const m = d.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (!m) return d;
-  return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
-};
+const AMOUNT = /\$\s*(\()?\s*([\d,]+\.\d{2})\)?/g;
+const PAYMENT = /payment\s+from\s+([A-Za-z][A-Za-z']*)\s*[-–]?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i;
+const BALANCE = /([A-Za-z][A-Za-z']*)'s\s+balance/i;
+const TOTAL = /total\s+due\s+from\s+([A-Za-z][A-Za-z']*)/i;
+const SUBTOTAL = /\bsub\s*total\b/i;
 
-function party(all: Record<string, Party>, name: string): Party {
-  if (!all[name]) all[name] = { payments: [], balance: null, totalDue: null, retainer: null };
-  return all[name];
+const num = (s: string) => Number(String(s).replace(/[,$\s]/g, ""));
+const title = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+function iso(d: string) {
+  const m = d.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : d;
 }
 
 export function parseBill(text: string): Parsed {
-  const t = String(text || "");
+  const lines = String(text || "").split(/\r?\n/);
+
+  // The summary sits after the fee table, so start at the last subtotal.
+  let start = 0;
+  for (let i = lines.length - 1; i >= 0; i--) if (SUBTOTAL.test(lines[i])) { start = i; break; }
+  if (!start) {
+    const j = lines.findIndex((l) => /payment\s+from/i.test(l));
+    if (j >= 0) start = j;
+  }
+
   const parties: Record<string, Party> = {};
+  const party = (n: string) => (parties[n] ||= { payments: [], balance: null, totalDue: null, initial: null });
 
-  // "Payment from Father - 11/21/2025   $ (2,499.00)"
-  for (const m of t.matchAll(/Payment from ([A-Za-z][A-Za-z']*)\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{4})[^$\n]*\$\s*\(?\s*([\d,]+\.\d{2})\)?/g)) {
-    party(parties, m[1].trim()).payments.push({ date: iso(m[2]), amount: num(m[3]) });
-  }
-  // "Father's balance   $ (508.13)"  — bracketed means a credit, so negative.
-  for (const m of t.matchAll(/([A-Za-z][A-Za-z']*?)'s balance[^$\n]*\$\s*(\(?)\s*([\d,]+\.\d{2})\)?/g)) {
-    party(parties, m[1].trim()).balance = (m[2] ? -1 : 1) * num(m[3]);
-  }
-  // "Total due from Father [current balance plus retainer replenishment]  $ 1,991.88"
-  for (const m of t.matchAll(/Total due from ([A-Za-z][A-Za-z']*)\b[^$\n]*\$\s*\(?\s*([\d,]+\.\d{2})\)?/g)) {
-    party(parties, m[1].trim()).totalDue = num(m[2]);
-  }
-  // "($2500) requested"
-  const ret = t.match(/\(\$?\s*([\d,]+(?:\.\d{2})?)\s*\)\s*requested/i);
-  if (ret) for (const k of Object.keys(parties)) parties[k].retainer = num(ret[1]);
+  let subtotal: number | null = null;
+  let pending: { k: string; p?: string; d?: string } | null = null;
+  let labelEnd = -1;
+  let age = 0;
 
-  const sub = t.match(/Subtotal[^$\n]*\$\s*([\d,]+\.\d{2})/i);
+  for (let i = start; i < lines.length; i++) {
+    const line = lines[i];
+    let m: RegExpMatchArray | null;
 
-  // "2026.06.05 GAL Billing - CORRECTED (Buchanan)" style headers, if present.
-  const nameM = t.match(/\(([A-Z][A-Za-z' .-]{2,40})\)\s*(?:GAL)?\s*$/m) || t.match(/GAL Billing[^\n(]*\(([^)]{2,40})\)/);
-  const dateM = t.match(/\b(20\d{2})[.\-\/](\d{1,2})[.\-\/](\d{1,2})\b/);
+    if ((m = line.match(PAYMENT))) { pending = { k: "pay", p: title(m[1]), d: iso(m[2]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
+    else if ((m = line.match(BALANCE))) { pending = { k: "bal", p: title(m[1]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
+    else if ((m = line.match(TOTAL))) { pending = { k: "tot", p: title(m[1]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
+    else if ((m = line.match(SUBTOTAL))) { pending = { k: "sub" }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
+
+    if (!pending) continue;
+
+    let took = false;
+    AMOUNT.lastIndex = 0;
+    let a: RegExpExecArray | null;
+    while ((a = AMOUNT.exec(line))) {
+      if (labelEnd >= 0 && a.index < labelEnd) continue;   // the label's own "($2500)"
+      const negative = !!a[1];
+      const value = num(a[2]);
+      if (pending.k === "pay") party(pending.p!).payments.push({ date: pending.d!, amount: value });
+      else if (pending.k === "bal") party(pending.p!).balance = negative ? -value : value;
+      else if (pending.k === "tot") party(pending.p!).totalDue = value;
+      else if (pending.k === "sub") subtotal = value;
+      pending = null; labelEnd = -1; took = true;
+      break;
+    }
+    if (!took && ++age > 4) { pending = null; labelEnd = -1; }
+  }
 
   for (const k of Object.keys(parties)) {
-    parties[k].payments.sort((a, b) => (a.date < b.date ? -1 : 1));
+    parties[k].payments.sort((x, y) => (x.date < y.date ? -1 : 1));
+    // The opening retainer is everything paid on the first day money came in.
+    // Buchanan's father paid $1.00 and $2,499.00 the same day to make $2,500.
+    const first = parties[k].payments[0];
+    parties[k].initial = first
+      ? parties[k].payments.filter((p) => p.date === first.date).reduce((n, p) => n + p.amount, 0)
+      : null;
   }
+
+  // Retainer, either a sum ("($2500) requested") or a share ("replenishment (25%)").
+  const flat = String(text || "").replace(/\s+/g, " ");
+  const sum = flat.match(/\(\$?\s*([\d,]+(?:\.\d{2})?)\s*\)\s*requested/i);
+  const pct = flat.match(/replenishment\s*\(?\s*(\d{1,3})\s*%/i);
+
+  const nameM = String(text || "").match(/GAL Billing[^\n(]*\(([^)]{2,40})\)/i);
+
 
   return {
     parties,
-    subtotal: sub ? num(sub[1]) : null,
+    subtotal,
+    retainer: sum ? num(sum[1]) : null,
+    retainerNote: pct ? pct[1] + "%" : null,
     caseName: nameM ? nameM[1].trim() : null,
-    billDate: dateM ? `${dateM[1]}-${dateM[2].padStart(2, "0")}-${dateM[3].padStart(2, "0")}` : null,
+    billDate: null, // the as-of date is the one on the file name, never one from the entries
   };
 }

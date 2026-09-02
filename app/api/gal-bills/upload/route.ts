@@ -11,7 +11,12 @@ export const maxDuration = 120;
 // "2026.06.05 GAL Billing - CORRECTED (Buchanan).pdf" gives us both the
 // as-of date and the case, which is where they actually live.
 function fromFilename(name: string) {
-  const d = name.match(/(20\d{2})[.\-_](\d{1,2})[.\-_](\d{1,2})/);
+  // "2026.06.05 ..." and "... through 6.22.2026" are both in use.
+  let d = name.match(/(20\d{2})[.\-_](\d{1,2})[.\-_](\d{1,2})/);
+  if (!d) {
+    const us = name.match(/(\d{1,2})[.\-_](\d{1,2})[.\-_](20\d{2})/);
+    if (us) d = [us[0], us[3], us[1], us[2]] as any;
+  }
   const paren = name.match(/\(([^)]{2,60})\)/);
   let caseName = paren ? paren[1].trim() : null;
   if (!caseName) {
@@ -45,7 +50,7 @@ export async function POST(req: Request) {
 
         const fn = fromFilename(file.name);
         const caseName = (form.get("case_name") as string) || fn.caseName || parsed.caseName;
-        const billDate = (form.get("bill_date") as string) || fn.billDate || parsed.billDate;
+        const billDate = (form.get("bill_date") as string) || fn.billDate; // never guessed from the text
 
         out.parsed = parsed;
         out.case_name = caseName;
