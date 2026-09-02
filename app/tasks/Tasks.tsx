@@ -11,6 +11,7 @@ import Parade from "../Parade";
 import ParadeControls from "../ParadeControls";
 import { celebrate } from "../celebrate";
 import { seasonFor } from "../../lib/seasons";
+import Rules from "./Rules";
 import { CF } from "../../lib/constants";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
@@ -107,6 +108,8 @@ export default function Tasks() {
   const [syncing, setSyncing] = useState(false);
   const choices = useChoices();
   const [leaving, setLeaving] = useState<number | null>(null);
+  const [cellEdit, setCellEdit] = useState<{ id: number; field: string } | null>(null);
+  const [showRules, setShowRules] = useState(false);
   const [rieOpen, setRieOpen] = useState<number | undefined>(undefined);
   const [extra, setExtra] = useState<{ id: string; name: string; type: string; choices?: any[] }[]>([]);
   const [groupId, setGroupId] = useState("");
@@ -257,6 +260,19 @@ export default function Tasks() {
     if (j.error) { setMsg({ kind: "err", text: j.error }); return false; }
     return true;
   }
+  // Inline: change one field and it saves at once.
+  async function saveCell(t: any, field: string, value: any) {
+    setCellEdit(null);
+    if (String(t[field] ?? "") === String(value ?? "")) return;
+    const r = await fetch("/api/tasks/" + t.id, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ [field]: value }),
+    });
+    const j = await r.json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    if (j.fired?.length) setMsg({ kind: "ok", text: "Rule ran: " + j.fired.join("; ") + "." });
+    load(); countRie();
+  }
+
   async function saveEdit(id: number) {
     if (!(await patch(id, draft))) return;
     setEditing(null); load(); countRie();
@@ -341,21 +357,55 @@ export default function Tasks() {
           <input type="checkbox" checked={!!t.closed} title={t.closed ? "Reopen this task" : "Mark this task done"} onChange={(e) => toggleClosed(t, e)} />
         </td>;
       case "priority":
-        return <td key={id} className="small"><Chip v={t.priority} colors={choices[CF.taskPriority]} /></td>;
+        return <td key={id} className="small edit" onClick={() => setCellEdit({ id: t.id, field: "priority" })}>
+          {cellEdit?.id === t.id && cellEdit.field === "priority" ? (
+            <select autoFocus defaultValue={t.priority || ""} onBlur={() => setCellEdit(null)}
+              onChange={(e) => saveCell(t, "priority", e.target.value)}>
+              <option value="">-</option>
+              {meta.priorities.map((x) => <option key={x} value={x}>{x}</option>)}
+            </select>
+          ) : <Chip v={t.priority} colors={choices[CF.taskPriority]} />}
+        </td>;
       case "case":
         return <td key={id}>{t.case_name || t.client_name || <span className="muted">-</span>}</td>;
       case "task":
-        return <td key={id}><div className="cellclip"><Linkify text={t.task} /></div></td>;
+        return <td key={id} className="edit" onDoubleClick={() => setCellEdit({ id: t.id, field: "task" })}>
+          {cellEdit?.id === t.id && cellEdit.field === "task" ? (
+            <textarea autoFocus defaultValue={t.task || ""} style={{ minHeight: 80 }}
+              onBlur={(e) => saveCell(t, "task", e.target.value)} />
+          ) : <div className="cellclip"><Linkify text={t.task} /></div>}
+        </td>;
       case "link":
         return <td key={id} className="small">{t.link
           ? <a href={t.link} target="_blank" rel="noreferrer" className="filelink" title={t.link}>{labelFor(t.link)}</a>
           : <span className="muted">-</span>}</td>;
       case "status":
-        return <td key={id} className="small"><Chip v={t.status} colors={choices[CF.taskStatus]} /></td>;
+        return <td key={id} className="small edit" onClick={() => setCellEdit({ id: t.id, field: "status" })}>
+          {cellEdit?.id === t.id && cellEdit.field === "status" ? (
+            <select autoFocus defaultValue={t.status || ""} onBlur={() => setCellEdit(null)}
+              onChange={(e) => saveCell(t, "status", e.target.value)}>
+              <option value="">-</option>
+              {meta.statuses.map((x) => <option key={x} value={x}>{x}</option>)}
+            </select>
+          ) : <Chip v={t.status} colors={choices[CF.taskStatus]} />}
+        </td>;
       case "who":
-        return <td key={id} className="who"><Chip v={t.who} colors={choices[CF.taskWho]} dash={false} /></td>;
+        return <td key={id} className="who edit" onClick={() => setCellEdit({ id: t.id, field: "who" })}>
+          {cellEdit?.id === t.id && cellEdit.field === "who" ? (
+            <select autoFocus defaultValue={t.who || ""} onBlur={() => setCellEdit(null)}
+              onChange={(e) => saveCell(t, "who", e.target.value)}>
+              <option value="">-</option>
+              {TASK_USERS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          ) : <Chip v={t.who} colors={choices[CF.taskWho]} dash={false} />}
+        </td>;
       case "due":
-        return <td key={id} className="date">{d10(t.due_date)}</td>;
+        return <td key={id} className="date edit" onClick={() => setCellEdit({ id: t.id, field: "due_date" })}>
+          {cellEdit?.id === t.id && cellEdit.field === "due_date" ? (
+            <input type="date" autoFocus defaultValue={d10(t.due_date)} onBlur={() => setCellEdit(null)}
+              onChange={(e) => saveCell(t, "due_date", e.target.value)} />
+          ) : (d10(t.due_date) || <span className="muted">-</span>)}
+        </td>;
       case "modified":
         return <td key={id} className="date nowrap" title={stamp(t.at_modified || t.updated_at)}>{when(t.at_modified || t.updated_at)}</td>;
       default:
@@ -422,6 +472,10 @@ export default function Tasks() {
         </div>
       </div>
 
+      {showRules ? (
+        <Rules statuses={meta.statuses} priorities={meta.priorities} users={TASK_USERS} onChanged={load} />
+      ) : null}
+
       <div className="card" data-tone="task">
         <h2>Tasks</h2>
         <div className="row" style={{ marginBottom: 9 }}>
@@ -456,6 +510,7 @@ export default function Tasks() {
                 </div>
               ) : null}
             </div>
+            <button className={"btn sm" + (showRules ? " primary" : "")} onClick={() => setShowRules(!showRules)}>Automations</button>
             <ParadeControls />
             <button className="btn sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
