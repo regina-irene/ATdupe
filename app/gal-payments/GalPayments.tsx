@@ -22,6 +22,9 @@ export default function GalPayments() {
   const [payFor, setPayFor] = useState<string | null>(null);
   const [pform, setPform] = useState<any>({ party: "", paid_on: "", amount: "", method: "", note: "" });
   const [bulk, setBulk] = useState("");
+  const [cands, setCands] = useState<any[]>([]);
+  const [payOver, setPayOver] = useState(false);
+  const [reading, setReading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
   const [q, setQ] = useState("");
@@ -60,6 +63,9 @@ export default function GalPayments() {
       const j = await (await fetch("/api/gal-bills/upload", { method: "POST", body: fd })).json();
       if (j.error) throw new Error(j.error);
       setResults(j.results || []);
+      if (j.payments?.length) {
+        setCands(j.payments.map((c: any) => ({ ...c, amount: c.amount ?? "", paid_on: c.paid_on || "", keep: true })));
+      }
       const pending: Record<string, { case_name: string; bill_date: string }> = {};
       for (const r of j.results || []) {
         if (r.status === "needs-details") pending[r.file] = { case_name: r.case_name || "", bill_date: r.bill_date || "" };
@@ -68,7 +74,8 @@ export default function GalPayments() {
       const failed = (j.results || []).filter((r: any) => r.status === "failed" || r.status === "no-summary").length;
       setMsg({
         kind: failed || Object.keys(pending).length ? "warn" : "ok",
-        text: `Read ${list.length} file${list.length > 1 ? "s" : ""}: ${j.saved} saved`
+        text: `Read ${list.length} file${list.length > 1 ? "s" : ""}: ${j.saved} bill${j.saved === 1 ? "" : "s"} saved`
+          + (j.payments?.length ? `, ${j.payments.length} payment${j.payments.length > 1 ? "s" : ""} to check below` : "")
           + (Object.keys(pending).length ? `, ${Object.keys(pending).length} need a case name or date` : "")
           + (failed ? `, ${failed} could not be read` : "") + ".",
       });
@@ -127,6 +134,50 @@ export default function GalPayments() {
     })).json();
     if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
     setBulk("");
+    setMsg({ kind: "ok", text: `Recorded ${j.added} payment${j.added > 1 ? "s" : ""}.` });
+    load();
+  }
+
+  // Receipts and processor exports. Everything lands as a proposal first.
+  async function readReceipts(caseName: string, files: FileList | File[]) {
+    const list = Array.from(files);
+    if (!list.length) return;
+    setReading(true); setMsg(null);
+    try {
+      const fd = new FormData();
+      for (const f of list) fd.append("files", f);
+      const j = await (await fetch("/api/gal-payments/upload", { method: "POST", body: fd })).json();
+      if (j.error) throw new Error(j.error);
+      const parties = Object.keys(rows.find((r) => r.case_name === caseName)?.data?.parties || {});
+      const found: any[] = [];
+      for (const r of j.results || []) {
+        for (const c of r.candidates || []) {
+          found.push({
+            ...c,
+            party: parties.includes(c.party) ? c.party : (parties.length === 1 ? parties[0] : ""),
+            amount: c.amount ?? "",
+            paid_on: c.paid_on || "",
+            file: r.file,
+            keep: true,
+          });
+        }
+        if (!r.candidates?.length) setMsg({ kind: "warn", text: `${r.file}: nothing recognisable found${r.why ? " (" + r.why + ")" : ""}.` });
+      }
+      setCands(found);
+      if (found.length) setMsg({ kind: "ok", text: `Found ${found.length} possible payment${found.length > 1 ? "s" : ""}. Check them, then save.` });
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setReading(false);
+  }
+
+  async function saveCandidates(caseName?: string) {
+    const payments = cands.filter((c) => c.keep && (c.case_name || caseName) && c.party && c.paid_on && Number(c.amount) > 0)
+      .map((c) => ({ case_name: c.case_name || caseName, party: c.party, paid_on: c.paid_on, amount: Number(c.amount), method: c.method || null }));
+    if (!payments.length) { setMsg({ kind: "err", text: "Each row needs a case, a party, a date and an amount." }); return; }
+    const j = await (await fetch("/api/gal-payments", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ payments }),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setCands([]);
     setMsg({ kind: "ok", text: `Recorded ${j.added} payment${j.added > 1 ? "s" : ""}.` });
     load();
   }
@@ -239,10 +290,53 @@ export default function GalPayments() {
                 onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.currentTarget.value = ""; }} />
               <b>{busy ? "Reading the bills..." : "Drop GAL bills here, or click to choose"}</b>
               <span className="muted small">
-                PDFs, as many as you like at once. The case and the as-of date come from the file name,
-                so <code>2026.06.05 GAL Billing (Buchanan).pdf</code> needs nothing typed at all.
+                Bills and payment receipts together, as many as you like. Everything is read from the file
+                name, so <code>2026.06.05 GAL Billing (Buchanan).pdf</code> and
+                <code>2026.07.20 Payment from Father - $750 (Buchanan GAL).pdf</code> need nothing typed.
               </span>
             </div>
+
+            {cands.length ? (
+              <div className="tablewrap" style={{ marginTop: 10 }}>
+                <table className="data mini">
+                  <thead><tr>
+                    <th style={{ width: 34 }}></th><th style={{ width: 150 }}>Case</th>
+                    <th style={{ width: 110 }}>Party</th><th style={{ width: 140 }}>Paid on</th>
+                    <th style={{ width: 110 }}>Amount</th><th style={{ width: 130 }}>How</th><th>From</th>
+                  </tr></thead>
+                  <tbody>
+                    {cands.map((c, i) => {
+                      const set = (patch: any) => setCands(cands.map((x, n) => (n === i ? { ...x, ...patch } : x)));
+                      const known = rows.find((r) => r.case_name.toLowerCase() === String(c.case_name || "").toLowerCase());
+                      return (
+                        <tr key={i}>
+                          <td className="tick"><input type="checkbox" checked={c.keep} onChange={() => set({ keep: !c.keep })} /></td>
+                          <td><input type="text" list="galcases" value={c.case_name || ""} onChange={(e) => set({ case_name: e.target.value })} />
+                            <datalist id="galcases">{[...new Set(rows.map((r) => r.case_name))].map((n) => <option key={n} value={n} />)}</datalist>
+                          </td>
+                          <td>{known ? (
+                            <select value={c.party || ""} onChange={(e) => set({ party: e.target.value })}>
+                              <option value="">-</option>
+                              {Object.keys(known.data?.parties || {}).map((n) => <option key={n} value={n}>{n}</option>)}
+                            </select>
+                          ) : <input type="text" value={c.party || ""} onChange={(e) => set({ party: e.target.value })} />}</td>
+                          <td><input type="date" value={c.paid_on} onChange={(e) => set({ paid_on: e.target.value })} /></td>
+                          <td><input type="number" step="0.01" value={c.amount} onChange={(e) => set({ amount: e.target.value })} /></td>
+                          <td><input type="text" value={c.method || ""} onChange={(e) => set({ method: e.target.value })} /></td>
+                          <td className="muted small">{c.file || c.source}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="row" style={{ marginTop: 7 }}>
+                  <button className="btn primary sm" onClick={() => saveCandidates()}>Save the ticked payments</button>
+                  <button className="btn ghost sm" onClick={() => setCands([])}>Discard</button>
+                  <div className="spacer" />
+                  <span className="muted small">Nothing is recorded until you save.</span>
+                </div>
+              </div>
+            ) : null}
 
             {results.length ? (
               <div className="feed" style={{ marginTop: 10 }}>
@@ -322,6 +416,52 @@ export default function GalPayments() {
                       <button className="btn primary sm" onClick={() => addPayment(b.case_name)}>Add</button>
                     </div>
                   </div>
+                  <div className={"dropzone" + (payOver ? " over" : "")} style={{ padding: "16px 14px", marginTop: 9 }}
+                    onDragOver={(e) => { e.preventDefault(); setPayOver(true); }}
+                    onDragLeave={() => setPayOver(false)}
+                    onDrop={(e) => { e.preventDefault(); setPayOver(false); readReceipts(b.case_name, e.dataTransfer.files); }}
+                    onClick={() => document.getElementById("rcpt-" + b.id)?.click()}>
+                    <input id={"rcpt-" + b.id} type="file" multiple hidden accept=".pdf,.csv,.tsv,.txt"
+                      onChange={(e) => { if (e.target.files?.length) readReceipts(b.case_name, e.target.files); e.currentTarget.value = ""; }} />
+                    <b>{reading ? "Reading..." : "Or drop a receipt or export here"}</b>
+                    <span className="muted small">PDF receipts, or a CSV from the card processor. You check what it finds before it saves.</span>
+                  </div>
+
+                  {cands.length ? (
+                    <div className="tablewrap" style={{ marginTop: 9 }}>
+                      <table className="data mini">
+                        <thead><tr>
+                          <th style={{ width: 34 }}></th><th style={{ width: 120 }}>Party</th>
+                          <th style={{ width: 140 }}>Paid on</th><th style={{ width: 110 }}>Amount</th>
+                          <th style={{ width: 120 }}>How</th><th>Found on</th>
+                        </tr></thead>
+                        <tbody>
+                          {cands.map((c, i) => (
+                            <tr key={i}>
+                              <td className="tick"><input type="checkbox" checked={c.keep}
+                                onChange={() => setCands(cands.map((x, n) => n === i ? { ...x, keep: !x.keep } : x))} /></td>
+                              <td><select value={c.party} onChange={(e) => setCands(cands.map((x, n) => n === i ? { ...x, party: e.target.value } : x))}>
+                                <option value="">-</option>
+                                {Object.keys(b.data?.parties || {}).map((n) => <option key={n} value={n}>{n}</option>)}
+                              </select></td>
+                              <td><input type="date" value={c.paid_on}
+                                onChange={(e) => setCands(cands.map((x, n) => n === i ? { ...x, paid_on: e.target.value } : x))} /></td>
+                              <td><input type="number" step="0.01" value={c.amount}
+                                onChange={(e) => setCands(cands.map((x, n) => n === i ? { ...x, amount: e.target.value } : x))} /></td>
+                              <td><input type="text" value={c.method || ""}
+                                onChange={(e) => setCands(cands.map((x, n) => n === i ? { ...x, method: e.target.value } : x))} /></td>
+                              <td className="muted small">{c.source}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="row" style={{ marginTop: 7 }}>
+                        <button className="btn primary sm" onClick={() => saveCandidates(b.case_name)}>Save the ticked ones</button>
+                        <button className="btn ghost sm" onClick={() => setCands([])}>Discard</button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="row" style={{ marginTop: 7, alignItems: "flex-end" }}>
                     <div style={{ flex: 1 }}><label className="f">Or paste several, one per line</label>
                       <textarea value={bulk} onChange={(e) => setBulk(e.target.value)} style={{ minHeight: 56 }}

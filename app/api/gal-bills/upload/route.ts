@@ -3,6 +3,7 @@ import { q, ensureSchema } from "../../../../lib/db";
 import { authorize } from "../../../../lib/auth";
 import { parseBill } from "../../../../lib/galbill";
 import { extractLayoutText } from "../../../../lib/pdftext";
+import { fromFilename as payFromName, fromText as payFromText } from "../../../../lib/paymentdoc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,12 +41,31 @@ export async function POST(req: Request) {
     if (!files.length) return NextResponse.json({ error: "No files were sent." }, { status: 400 });
 
     const results: any[] = [];
+    const payments: any[] = [];
 
     for (const file of files) {
       const out: any = { file: file.name };
       try {
         const buf = new Uint8Array(await file.arrayBuffer());
         const text = await extractLayoutText(buf);
+
+        // A receipt, not a bill. Proposed rather than saved, so the figure is
+        // read by a person before it moves anyone's balance.
+        if (/payment/i.test(file.name) && !/billing/i.test(file.name)) {
+          const fn: any = payFromName(file.name);
+          const found = payFromText(text)[0] || {};
+          payments.push({
+            file: file.name,
+            case_name: fn.caseName || null,
+            party: fn.party || found.party || null,
+            paid_on: fn.paid_on || found.paid_on || null,
+            amount: fn.amount ?? found.amount ?? null,
+            method: found.method || null,
+            source: found.source || "from the file name",
+          });
+          continue;
+        }
+
         const parsed = parseBill(text);
 
         const fn = fromFilename(file.name);
@@ -78,6 +98,7 @@ export async function POST(req: Request) {
       ok: true,
       saved: results.filter((r) => r.status === "saved").length,
       results,
+      payments,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
