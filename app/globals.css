@@ -482,7 +482,7 @@ table.data.mini .twist{float:right;padding:0 0 0 6px}
 .walker .bob{display:inline-block;animation-name:bob;animation-timing-function:ease-in-out;animation-iteration-count:infinite;filter:drop-shadow(0 2px 2px rgba(15,23,42,.18))}
 @keyframes march{from{transform:translateX(-12vw)}to{transform:translateX(112vw)}}
 @keyframes bob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-6px) rotate(4deg)}}
-.burst{position:fixed;z-index:80;pointer-events:none;width:0;height:0}
+.burst{position:fixed;z-index:200;pointer-events:none;width:0;height:0}
 .burst span{position:absolute;left:0;top:0;line-height:1;will-change:transform,opacity}
 table.data tr.leaving td{animation:doneout .5s ease forwards}
 @keyframes doneout{
@@ -495,3 +495,4 @@ table.data tr.leaving td{animation:doneout .5s ease forwards}
   table.data tr.leaving td{animation:none;opacity:.45}
 }
 @media print{.parade{display:none}}
+.cheer{position:fixed;z-index:200;pointer-events:none;transform:translate(-50%,-140%);background:var(--good);color:#fff;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:3px 9px;border-radius:999px;box-shadow:var(--sh-lg)}

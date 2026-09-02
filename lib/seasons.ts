@@ -1,5 +1,5 @@
 // The parade changes with the month, the way the Monday.com llamas did.
-export type Season = { id: string; name: string; cast: string[] };
+export type Season = { id: string; name: string; cast: string[]; art?: "football" };
 
 const SEASONS: Record<number, Season> = {
   1:  { id: "winter",  name: "Deep winter",   cast: ["⛄", "❄️", "🐧", "🧣", "☕"] },
@@ -10,7 +10,8 @@ const SEASONS: Record<number, Season> = {
   6:  { id: "summer",  name: "Early summer",  cast: ["☀️", "🍉", "🕶️", "🏖️", "🐠"] },
   7:  { id: "july",    name: "Fourth of July", cast: ["🎆", "🎇", "🍦", "🗽", "🎈"] },
   8:  { id: "peach",   name: "Georgia summer", cast: ["🍑", "🌻", "🌴", "🍋", "🦩"] },
-  9:  { id: "football", name: "Football season", cast: ["🏈", "🏃", "📣", "🏆", "🎺"] },
+  // Drawn rather than emoji: football, helmet, jersey, goalpost, penalty flag.
+  9:  { id: "football", name: "Football season", cast: ["🏈", "🏈", "🏈", "🏈", "🏈"], art: "football" },
   10: { id: "spooky",  name: "Hallowe'en",    cast: ["🎃", "👻", "🦇", "🕸️", "🐈‍⬛"] },
   11: { id: "harvest", name: "Thanksgiving",  cast: ["🦃", "🍁", "🌽", "🥧", "🐿️"] },
   12: { id: "holiday", name: "The holidays",  cast: ["🎄", "🎁", "⛄", "🔔", "🦌"] },

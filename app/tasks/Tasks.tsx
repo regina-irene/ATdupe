@@ -105,6 +105,7 @@ export default function Tasks() {
   const [syncing, setSyncing] = useState(false);
   const choices = useChoices();
   const [leaving, setLeaving] = useState<number | null>(null);
+  const [rieOpen, setRieOpen] = useState<number | undefined>(undefined);
   const [groupId, setGroupId] = useState("");
   const [folded, setFolded] = useState<Record<string, boolean>>({});
 
@@ -180,6 +181,12 @@ export default function Tasks() {
     fetch("/api/tasks/meta").then((r) => r.json()).then((j) => { if (!j.error) setMeta(j); }).catch(() => {});
   }, []);
 
+  const countRie = useCallback(() => {
+    fetch("/api/tasks?who=RIE&pageSize=1")
+      .then((r) => r.json()).then((j) => { if (!j.error) setRieOpen(j.total || 0); }).catch(() => {});
+  }, []);
+  useEffect(() => { countRie(); }, [countRie]);
+
   const loadViews = useCallback(() => {
     fetch("/api/views?page=tasks").then((r) => r.json()).then((j) => { if (!j.error) setViews(j.rows || []); }).catch(() => {});
   }, []);
@@ -239,17 +246,28 @@ export default function Tasks() {
     if (j.error) { setMsg({ kind: "err", text: j.error }); return false; }
     return true;
   }
-  async function saveEdit(id: number) { if (await patch(id, draft)) { setEditing(null); load(); } }
+  async function saveEdit(id: number) {
+    if (!(await patch(id, draft))) return;
+    setEditing(null); load(); countRie();
+  }
   async function toggleClosed(t: any, e?: React.MouseEvent | React.ChangeEvent) {
     const closing = !t.closed;
     if (!(await patch(t.id, { closed: closing }))) return;
     if (!closing) { load(); return; }
     // Mark it done with a flourish before the list refreshes.
-    const el = (e?.target as HTMLElement)?.getBoundingClientRect?.();
     const big = ["p0", "p1"].indexOf(prioClass(t.priority)) >= 0;
-    if (el) celebrate(el.left + el.width / 2, el.top + el.height / 2, seasonFor().cast, big);
+    // Prefer where it was clicked; fall back to the row, then the middle of the
+    // screen, so there is always a reaction wherever it was ticked from.
+    let el = (e?.target as HTMLElement)?.getBoundingClientRect?.();
+    if (!el || (!el.width && !el.height)) {
+      const row = document.querySelector(`tr[data-task="${t.id}"]`);
+      el = row?.getBoundingClientRect();
+    }
+    const x = el ? el.left + Math.min(el.width, 60) / 2 : window.innerWidth / 2;
+    const y = el ? el.top + el.height / 2 : window.innerHeight / 2;
+    celebrate(x, y, seasonFor().cast, big);
     setLeaving(t.id);
-    setTimeout(() => { setLeaving(null); load(); }, 520);
+    setTimeout(() => { setLeaving(null); load(); countRie(); }, 520);
   }
 
   async function syncNow() {
@@ -259,7 +277,7 @@ export default function Tasks() {
       const j = await r.json();
       if (j.error) throw new Error(j.error);
       setMsg({ kind: "ok", text: `Pulled ${j.pulled} from Airtable, sent ${j.pushed_new} new and ${j.pushed_upd} updates.` });
-      load();
+      load(); countRie();
     } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
     setSyncing(false);
   }
@@ -466,7 +484,7 @@ export default function Tasks() {
               ) : (
                 <tr key={t.id} className={prioClass(t.priority)
                   + (!t.closed && t.due_date && d10(t.due_date) < today ? " overdue" : "")
-                  + (leaving === t.id ? " leaving" : "")}>
+                  + (leaving === t.id ? " leaving" : "")} data-task={t.id}>
                   {cols.map((c) => cell(c.id, t))}
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>
@@ -486,7 +504,7 @@ export default function Tasks() {
         </div>
       </div>
 
-      <Parade />
+      <Parade count={rieOpen} label="RIE open tasks" />
     </div>
   );
 }

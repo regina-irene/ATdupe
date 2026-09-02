@@ -3,10 +3,22 @@ import { readParade, SIZE_SCALE } from "./../lib/parade";
 // A burst where the task was ticked. Deliberately brief.
 export function celebrate(x: number, y: number, cast: string[], big = false) {
   if (typeof window === "undefined") return;
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
   const cfg = readParade();
   if (!cfg.on || cfg.celebrate === "off") return;
   if (cfg.celebrate === "priority" && !big) return;
+
+  // With reduced motion asked for, mark the moment without throwing things
+  // around the screen.
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    const tag = document.createElement("div");
+    tag.className = "cheer";
+    tag.textContent = "Done";
+    tag.style.left = x + "px";
+    tag.style.top = y + "px";
+    document.body.appendChild(tag);
+    setTimeout(() => tag.remove(), 1100);
+    return;
+  }
 
   const scale = SIZE_SCALE[cfg.size] || 1;
   const layer = document.createElement("div");

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ALL_SEASONS, seasonFor } from "../lib/seasons";
 import { readParade, writeParade, onParadeChange, type ParadeSettings } from "../lib/parade";
+import { celebrate } from "./celebrate";
 
 export default function ParadeControls() {
   const [open, setOpen] = useState(false);
@@ -58,8 +59,15 @@ export default function ParadeControls() {
             ))}
           </div>
 
+          <button className="btn sm" style={{ width: "100%", marginTop: 9 }}
+            onClick={(e) => {
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              celebrate(r.left + r.width / 2, r.top, cast, true);
+            }}>Try it</button>
+
           <p className="muted small" style={{ margin: "9px 0 0" }}>
-            Clearing anything off the board counts, so this is set to every one.
+            One walker per open RIE task, so the parade thins out as you clear the board.
+            Clearing anything counts, so this is set to every one.
           </p>
           <div style={{ fontSize: 20, marginTop: 6, textAlign: "center" }}>{cast.join(" ")}</div>
         </div>
