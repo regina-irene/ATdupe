@@ -6,6 +6,9 @@ import Chip, { useChoices } from "../Chip";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { Resizer, useColWidths } from "../colwidths";
 import RowSize from "../RowSize";
+import Parade from "../Parade";
+import { celebrate } from "../celebrate";
+import { seasonFor } from "../../lib/seasons";
 import { CF } from "../../lib/constants";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
@@ -100,6 +103,7 @@ export default function Tasks() {
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
   const choices = useChoices();
+  const [leaving, setLeaving] = useState<number | null>(null);
   const [groupId, setGroupId] = useState("");
   const [folded, setFolded] = useState<Record<string, boolean>>({});
 
@@ -235,7 +239,16 @@ export default function Tasks() {
     return true;
   }
   async function saveEdit(id: number) { if (await patch(id, draft)) { setEditing(null); load(); } }
-  async function toggleClosed(t: any) { if (await patch(t.id, { closed: !t.closed })) load(); }
+  async function toggleClosed(t: any, e?: React.MouseEvent | React.ChangeEvent) {
+    const closing = !t.closed;
+    if (!(await patch(t.id, { closed: closing }))) return;
+    if (!closing) { load(); return; }
+    // Mark it done with a flourish before the list refreshes.
+    const el = (e?.target as HTMLElement)?.getBoundingClientRect?.();
+    if (el) celebrate(el.left + el.width / 2, el.top + el.height / 2, seasonFor().cast);
+    setLeaving(t.id);
+    setTimeout(() => { setLeaving(null); load(); }, 520);
+  }
 
   async function syncNow() {
     setSyncing(true);
@@ -448,7 +461,9 @@ export default function Tasks() {
                   </div>
                 </td></tr>
               ) : (
-                <tr key={t.id} className={prioClass(t.priority) + (!t.closed && t.due_date && d10(t.due_date) < today ? " overdue" : "")}>
+                <tr key={t.id} className={prioClass(t.priority)
+                  + (!t.closed && t.due_date && d10(t.due_date) < today ? " overdue" : "")
+                  + (leaving === t.id ? " leaving" : "")}>
                   {cols.map((c) => cell(c.id, t))}
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>
@@ -467,6 +482,8 @@ export default function Tasks() {
           <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
         </div>
       </div>
+
+      <Parade />
     </div>
   );
 }
