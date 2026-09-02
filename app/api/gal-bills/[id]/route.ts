@@ -18,12 +18,13 @@ export async function PATCH(req: Request, ctx: any) {
     if (!cur.length) return NextResponse.json({ error: "That bill is no longer there." }, { status: 404 });
 
     const data = cur[0].data || {};
-    if (b.initials && typeof b.initials === "object") {
+    for (const [field, patch] of [["initial", b.initials], ["share", b.shares]] as const) {
+      if (!patch || typeof patch !== "object") continue;
       data.parties = data.parties || {};
-      for (const name of Object.keys(b.initials)) {
+      for (const name of Object.keys(patch)) {
         if (!data.parties[name]) continue;
-        const v = b.initials[name];
-        data.parties[name].initial = v === "" || v === null ? null : Number(v);
+        const v = (patch as any)[name];
+        (data.parties[name] as any)[field] = v === "" || v === null ? null : Number(v);
       }
     }
     await q(

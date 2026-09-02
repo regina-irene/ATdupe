@@ -11,6 +11,7 @@ export type Party = {
   balance: number | null;    // negative means credit remaining
   totalDue: number | null;
   initial?: number | null;   // the retainer paid at the outset
+  share?: number | null;     // this party's percentage of the fees
 };
 export type Parsed = {
   parties: Record<string, Party>;
@@ -46,7 +47,7 @@ export function parseBill(text: string): Parsed {
   }
 
   const parties: Record<string, Party> = {};
-  const party = (n: string) => (parties[n] ||= { payments: [], balance: null, totalDue: null, initial: null });
+  const party = (n: string) => (parties[n] ||= { payments: [], balance: null, totalDue: null, initial: null, share: null });
 
   let subtotal: number | null = null;
   let pending: { k: string; p?: string; d?: string } | null = null;
@@ -56,10 +57,21 @@ export function parseBill(text: string): Parsed {
   for (let i = start; i < lines.length; i++) {
     const line = lines[i];
     let m: RegExpMatchArray | null;
+    // Only guard against a label's own bracketed figure on the line the label
+    // is on. Carrying the offset onto the next line threw away amounts that sit
+    // further left than the label above them.
+    labelEnd = -1;
 
     if ((m = line.match(PAYMENT))) { pending = { k: "pay", p: title(m[1]), d: iso(m[2]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
     else if ((m = line.match(BALANCE))) { pending = { k: "bal", p: title(m[1]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
-    else if ((m = line.match(TOTAL))) { pending = { k: "tot", p: title(m[1]) }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
+    else if ((m = line.match(TOTAL))) {
+      pending = { k: "tot", p: title(m[1]) };
+      labelEnd = (m.index || 0) + m[0].length;
+      age = 0;
+      // The split is printed right after the name: "FROM FATHER (25%)".
+      const pc = line.slice(labelEnd).match(/^\s*\(?\s*(\d{1,3})\s*%/);
+      if (pc) party(pending.p!).share = Number(pc[1]);
+    }
     else if ((m = line.match(SUBTOTAL))) { pending = { k: "sub" }; labelEnd = (m.index || 0) + m[0].length; age = 0; }
 
     if (!pending) continue;

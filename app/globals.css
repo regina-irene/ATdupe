@@ -465,3 +465,4 @@ table.data.mini .twist{float:right;padding:0 0 0 6px}
 :root[data-mode=dark] .partycol[data-party=mother]{--pty:#f472b6}
 :root[data-mode=dark] .partycol[data-party]{background:color-mix(in srgb,var(--pty) 9%,var(--panel))}
 @media print{.partycol[data-party]{background:color-mix(in srgb,var(--pty) 8%,#fff)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.sharepill{float:right;font-size:10px;font-weight:800;padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--pty,var(--accent)) 20%,var(--panel));color:var(--pty,var(--accent))}

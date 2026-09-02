@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Party = { payments: { date: string; amount: number }[]; balance: number | null; totalDue: number | null; retainer?: number | null; initial?: number | null };
+type Party = { payments: { date: string; amount: number }[]; balance: number | null; totalDue: number | null; retainer?: number | null; initial?: number | null; share?: number | null };
 type Bill = {
   id: number; case_name: string; bill_date: string; subtotal: number | null;
   data: { parties?: Record<string, Party> }; note: string | null; updated_by: string | null;
@@ -199,14 +199,18 @@ export default function GalPayments() {
 
   function startEdit(b: Bill) {
     const initials: Record<string, string> = {};
-    for (const [n, p] of Object.entries(b.data?.parties || {})) initials[n] = p.initial == null ? "" : String(p.initial);
-    setDraft({ case_name: b.case_name, bill_date: b.bill_date, initials });
+    const shares: Record<string, string> = {};
+    for (const [n, p] of Object.entries(b.data?.parties || {})) {
+      initials[n] = p.initial == null ? "" : String(p.initial);
+      shares[n] = p.share == null ? "" : String(p.share);
+    }
+    setDraft({ case_name: b.case_name, bill_date: b.bill_date, initials, shares });
     setEditing(b.id);
   }
   async function saveEdit(b: Bill) {
     const j = await (await fetch("/api/gal-bills/" + b.id, {
       method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ case_name: draft.case_name, bill_date: draft.bill_date, initials: draft.initials }),
+      body: JSON.stringify({ case_name: draft.case_name, bill_date: draft.bill_date, initials: draft.initials, shares: draft.shares }),
     })).json();
     if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
     setEditing(null); load();
@@ -480,9 +484,14 @@ export default function GalPayments() {
                     <input type="date" value={draft.bill_date || ""} style={{ width: 150 }}
                       onChange={(e) => setDraft({ ...draft, bill_date: e.target.value })} /></div>
                   {Object.keys(b.data?.parties || {}).map((n) => (
-                    <div key={n}><label className="f">{n} initial retainer</label>
-                      <input type="number" step="0.01" style={{ width: 130 }} value={draft.initials?.[n] ?? ""}
-                        onChange={(e) => setDraft({ ...draft, initials: { ...draft.initials, [n]: e.target.value } })} /></div>
+                    <div key={n} className="row" style={{ gap: 6 }}>
+                      <div><label className="f">{n} retainer</label>
+                        <input type="number" step="0.01" style={{ width: 120 }} value={draft.initials?.[n] ?? ""}
+                          onChange={(e) => setDraft({ ...draft, initials: { ...draft.initials, [n]: e.target.value } })} /></div>
+                      <div><label className="f">{n} share %</label>
+                        <input type="number" step="1" min={0} max={100} style={{ width: 90 }} value={draft.shares?.[n] ?? ""}
+                          onChange={(e) => setDraft({ ...draft, shares: { ...draft.shares, [n]: e.target.value } })} /></div>
+                    </div>
                   ))}
                   <div style={{ alignSelf: "flex-end" }}>
                     <button className="btn primary sm" onClick={() => saveEdit(b)}>Save</button>
@@ -497,7 +506,10 @@ export default function GalPayments() {
                   const paid = p.payments.reduce((n, x) => n + Number(x.amount || 0), 0);
                   return (
                     <div className="partycol" data-party={name.trim().toLowerCase()} key={name}>
-                      <div className="partyhead">{name}</div>
+                      <div className="partyhead">
+                        {name}
+                        {p.share != null ? <span className="sharepill">{p.share}%</span> : null}
+                      </div>
                       <table className="data mini">
                         <thead><tr><th>Payment date</th><th className="money">Amount</th></tr></thead>
                         <tbody>
@@ -533,7 +545,11 @@ export default function GalPayments() {
                         </table>
                       ) : null}
                       <div className="partyfoot">
+                        <div><span>Share of fees</span><b>{p.share == null ? "-" : p.share + "%"}</b></div>
                         <div><span>Initial retainer</span><b>{p.initial == null ? "-" : money(p.initial)}</b></div>
+                        {p.share != null && b.subtotal ? (
+                          <div><span>Their share of {money(b.subtotal)}</span><b>{money(Number(b.subtotal) * Number(p.share) / 100)}</b></div>
+                        ) : null}
                         <div><span>Balance</span><b className={p.balance !== null && p.balance > 0 ? "hot" : ""}>
                           {p.balance === null ? "-" : p.balance < 0 ? money(-p.balance) + " credit" : money(p.balance)}
                         </b></div>
