@@ -247,14 +247,18 @@ export default function GalPayments() {
       seen.add(k);
       fees += Number(r.subtotal || 0);
       for (const [name, p] of Object.entries(r.data?.parties || {})) {
-        const due = Number(p.totalDue || 0);
         const later = paid.filter((x) =>
           x.case_name.toLowerCase() === k &&
           String(x.party).toLowerCase() === name.toLowerCase() &&
           x.paid_on > r.bill_date);
         const sum = later.reduce((n, x) => n + Number(x.amount || 0), 0);
-        billed += due;
+        // Where a bill states no amount due, fall back to a balance owed, and
+        // where neither exists, leave this party out rather than count zero.
+        const due = p.totalDue != null ? Number(p.totalDue)
+          : p.balance != null && Number(p.balance) > 0 ? Number(p.balance) : null;
         collected += sum;
+        if (due == null) continue;
+        billed += due;
         owing += Math.max(0, due - sum);
       }
     }
@@ -424,13 +428,23 @@ export default function GalPayments() {
                   const paidAll = parties.reduce((n, [name, p]) =>
                     n + p.payments.reduce((m, x) => m + Number(x.amount || 0), 0)
                       + since(b, name).reduce((m, x) => m + Number(x.amount || 0), 0), 0);
-                  const owingAll = parties.reduce((n, [name, p]) =>
-                    n + Math.max(0, Number(p.totalDue || 0) - since(b, name).reduce((m, x) => m + Number(x.amount || 0), 0)), 0);
+                  let owingAll = 0;
+                  let owingKnown = false;
+                  for (const [name, p] of parties) {
+                    const a = account(b, name, p);
+                    if (a.nowOwing == null) continue;
+                    owingKnown = true;
+                    owingAll += Math.max(0, a.nowOwing);
+                  }
                   return (
                     <div className="stats casefigures">
                       <div className="stat"><b>{money(b.subtotal)}</b><span>Fees incurred</span></div>
                       <div className="stat"><b>{money(paidAll)}</b><span>Paid to date</span></div>
-                      <div className="stat"><b className={owingAll > 0.005 ? "hot" : "paidoff"}>{money(owingAll)}</b><span>Still owing</span></div>
+                      <div className="stat">
+                        <b className={!owingKnown ? "muted" : owingAll > 0.005 ? "hot" : "paidoff"}>
+                          {!owingKnown ? "not stated" : money(owingAll)}
+                        </b><span>Still owing</span>
+                      </div>
                     </div>
                   );
                 })()}
@@ -607,9 +621,11 @@ export default function GalPayments() {
                             <div><span>Paid since</span><b>{money(ac.laterPaid)}</b></div>
                             <div className="due">
                               <span>Now owing</span>
-                              <b className={(ac.nowOwing ?? 0) <= 0.005 ? "paidoff" : ""}>
-                                {(ac.nowOwing ?? 0) <= 0.005 ? "Paid in full" : money(ac.nowOwing)}
-                              </b>
+                              {ac.nowOwing == null ? (
+                                <b className="muted" title="This bill does not state an amount due for this party">not stated</b>
+                              ) : ac.nowOwing <= 0.005 ? (
+                                <b className="paidoff">Paid in full</b>
+                              ) : <b>{money(ac.nowOwing)}</b>}
                             </div>
                             <div><span>Last payment</span><b>{shortDate(since(b, name).map((x) => x.paid_on).sort().slice(-1)[0])}</b></div>
                           </>
