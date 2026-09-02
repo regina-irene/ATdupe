@@ -92,6 +92,8 @@ export default function Tasks() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const dragged = useRef(false);
+  const [picker, setPicker] = useState(false);
+  const pickerBox = useRef<HTMLDivElement>(null);
   const cw = useColWidths("efl.tasks.widths");
 
   const [editing, setEditing] = useState<number | null>(null);
@@ -132,6 +134,13 @@ export default function Tasks() {
   const current = useMemo(() => ({ who, status, priority, caseQ, q, showClosed, sort, dir }),
     [who, status, priority, caseQ, q, showClosed, sort, dir]);
   const isBlank = useMemo(() => JSON.stringify(current) === JSON.stringify(BLANK), [current]);
+
+  useEffect(() => {
+    if (!picker) return;
+    const away = (e: MouseEvent) => { if (pickerBox.current && !pickerBox.current.contains(e.target as Node)) setPicker(false); };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [picker]);
 
   const qs = useMemo(() => {
     const p = new URLSearchParams();
@@ -348,6 +357,29 @@ export default function Tasks() {
             <RowSize />
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <span className="muted small">Click a heading to sort. Drag a heading to move the column.</span>
+            <div className="ms" ref={pickerBox}>
+              <button className="btn sm" onClick={() => setPicker(!picker)}>Columns ({cols.length}/{COLUMNS.length})</button>
+              {picker ? (
+                <div className="mspanel" style={{ right: 0, left: "auto" }}>
+                  <div className="msrow">
+                    <button className="btn ghost sm" onClick={() => persist(COLUMNS.map((c) => c.id))}>Show all</button>
+                    <button className="btn ghost sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset</button>
+                    <div className="spacer" />
+                    <button className="btn ghost sm" onClick={() => setPicker(false)}>Done</button>
+                  </div>
+                  <div className="mslist">
+                    {COLUMNS.map((c) => (
+                      <label key={c.id} className="msitem">
+                        <input type="checkbox" checked={order.indexOf(c.id) >= 0}
+                          onChange={() => persist(order.indexOf(c.id) >= 0 ? order.filter((x) => x !== c.id) : [...order, c.id])} />
+                        <span>{c.label}</span>
+                        {order.indexOf(c.id) < 0 ? <span className="muted small" style={{ marginLeft: "auto" }}>hidden</span> : null}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <button className="btn sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
