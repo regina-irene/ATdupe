@@ -37,8 +37,23 @@ export default async function Page() {
             <Row ok={!!process.env.AIRTABLE_TOKEN} label="AIRTABLE_TOKEN" note="Needs data.records:read and data.records:write on this base." />
             <Row ok={!!process.env.ANTHROPIC_API_KEY} label="ANTHROPIC_API_KEY" note={"Powers Make billing ready. Model: " + (process.env.ANTHROPIC_MODEL || "claude-sonnet-5") + "."} />
             <Row ok={!!process.env.API_TOKEN} label="API_TOKEN" note="Optional. Only for outside automations posting entries." />
-            <Row ok={!!process.env.APP_URL} label="APP_URL" note="Optional. Pin the sign-in address, e.g. https://efl-time-board-edwardslaw.vercel.app" />
+            <Row ok={!!process.env.APP_URL} label="APP_URL" note={"Pins the sign-in address. Currently " + (process.env.APP_URL || "not set, so the address of whatever host you arrive on is used.")} />
           </tbody></table>
+        </div>
+
+        <div className="card" data-tone="info">
+          <h2>Sign-in address</h2>
+          <p className="small" style={{ marginTop: 0 }}>
+            Google will only accept a sign-in that comes back to an address you have registered on the
+            OAuth client. This exact string has to appear under <b>Authorised redirect URIs</b> at
+            {" "}<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">console.cloud.google.com/apis/credentials</a>:
+          </p>
+          <pre>{(process.env.APP_URL || "https://chambers.edwardsfamilylaw.com") + "/api/auth/callback"}</pre>
+          <p className="small muted" style={{ marginBottom: 0 }}>
+            Keep the old vercel.app one registered as well so both addresses keep working. If sign-in fails
+            with &quot;this app&apos;s request is invalid&quot;, that means the address the app sent is not on
+            the list. <a href="/api/health" target="_blank" rel="noreferrer">Check what it is actually sending</a>.
+          </p>
         </div>
 
         <SyncPanel />
