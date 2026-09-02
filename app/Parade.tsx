@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { seasonFor, ALL_SEASONS } from "../lib/seasons";
 import { readParade, onParadeChange, SIZE_SCALE, type ParadeSettings } from "../lib/parade";
 import { FOOTBALL_ART } from "./FootballArt";
+import Llama from "./Llama";
 import { celebrate } from "./celebrate";
 
 const MAX = 40; // past this the strip is a crowd, not a count
@@ -33,17 +34,20 @@ export default function Parade({ count, label }: { count?: number; label?: strin
   const walkers = useMemo(() => {
     const art = season.art === "football" ? FOOTBALL_ART : null;
     const spread = Math.max(n, 6);
-    return Array.from({ length: n }, (_, i) => ({
-      i,
-      // Every fifth one is a llama, whatever the month.
-      llama: i > 0 && i % 5 === 0,
-      Art: art && !(i > 0 && i % 5 === 0) ? art[i % art.length] : null,
-      ch: season.cast[i % season.cast.length],
-      delay: (i * (44 / spread)) % 44,
-      dur: 34 + ((i * 7) % 16),
-      size: Math.round((22 + ((i * 5) % 12)) * scale),
-      bob: 0.7 + ((i % 4) * 0.22),
-    }));
+    return Array.from({ length: n }, (_, i) => {
+      // Two llamas to every prop, so the llamas are clearly the parade.
+      const isLlama = i % 3 !== 2;
+      return {
+        i,
+        isLlama,
+        Art: !isLlama && art ? art[i % art.length] : null,
+        ch: season.cast[i % season.cast.length],
+        delay: (i * (44 / spread)) % 44,
+        dur: 34 + ((i * 7) % 16),
+        size: Math.round((isLlama ? 30 : 22 + ((i * 5) % 12)) * scale),
+        bob: 0.7 + ((i % 4) * 0.22),
+      };
+    });
   }, [season, scale, n]);
 
   // The count going down is the win. Pick someone and let them enjoy it.
@@ -58,7 +62,7 @@ export default function Parade({ count, label }: { count?: number; label?: strin
     setCheer(pick);
     const el = refs.current[pick];
     const r = el?.getBoundingClientRect();
-    const cast = season.art === "football" ? ["🏈", "🦙", "📣"] : season.cast;
+    const cast = season.art === "football" ? ["🏈", "🦙", "📣", "🎺"] : season.cast;
     celebrate(r ? r.left + r.width / 2 : window.innerWidth / 2,
               r ? r.top : window.innerHeight - 90, cast, true, true);
     const t = setTimeout(() => setCheer(null), 1600);
@@ -76,7 +80,7 @@ export default function Parade({ count, label }: { count?: number; label?: strin
           ref={(el) => { refs.current[w.i] = el; }}
           style={{ animationDuration: `${w.dur}s`, animationDelay: `-${w.delay}s`, fontSize: w.size }}>
           <span className="bob" style={{ animationDuration: `${w.bob}s` }}>
-            {w.llama ? "🦙" : w.Art ? <w.Art /> : w.ch}
+            {w.isLlama ? <Llama season={season.id} /> : w.Art ? <w.Art /> : w.ch}
           </span>
         </span>
       ))}

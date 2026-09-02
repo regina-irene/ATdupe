@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ALL_SEASONS, seasonFor } from "../lib/seasons";
 import { readParade, writeParade, onParadeChange, type ParadeSettings } from "../lib/parade";
 import { celebrate } from "./celebrate";
+import Llama from "./Llama";
 
 export default function ParadeControls() {
   const [open, setOpen] = useState(false);
@@ -69,7 +70,10 @@ export default function ParadeControls() {
             One walker per open RIE task, so the parade thins out as you clear the board.
             Clearing anything counts, so this is set to every one.
           </p>
-          <div style={{ fontSize: 20, marginTop: 6, textAlign: "center" }}>{cast.join(" ")}</div>
+          <div style={{ fontSize: 30, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <Llama season={(ALL_SEASONS.find((x) => x.id === cfg.season) || seasonFor()).id} />
+            <span style={{ fontSize: 18 }}>{cast.slice(0, 4).join(" ")}</span>
+          </div>
         </div>
       ) : null}
     </div>
