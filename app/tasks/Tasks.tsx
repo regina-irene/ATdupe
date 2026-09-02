@@ -106,6 +106,7 @@ export default function Tasks() {
   const choices = useChoices();
   const [leaving, setLeaving] = useState<number | null>(null);
   const [rieOpen, setRieOpen] = useState<number | undefined>(undefined);
+  const [extra, setExtra] = useState<{ id: string; name: string; type: string; choices?: any[] }[]>([]);
   const [groupId, setGroupId] = useState("");
   const [folded, setFolded] = useState<Record<string, boolean>>({});
 
@@ -179,6 +180,13 @@ export default function Tasks() {
 
   useEffect(() => {
     fetch("/api/tasks/meta").then((r) => r.json()).then((j) => { if (!j.error) setMeta(j); }).catch(() => {});
+    // Every other field on the Airtable Tasks table, offered as a column.
+    fetch("/api/mirror/tasks/schema").then((r) => r.json()).then((j) => {
+      if (j.error) return;
+      const mapped = new Set(Object.values(CF));
+      const skip = /^(client name|efl status case name|status|order|priority|closed|task|user|modified|duration|due date|folder ?\/ ?file link#2)$/i;
+      setExtra((j.fields || []).filter((f: any) => !mapped.has(f.id) && !skip.test(String(f.name).trim())));
+    }).catch(() => {});
   }, []);
 
   const countRie = useCallback(() => {
@@ -194,6 +202,7 @@ export default function Tasks() {
 
   function sortBy(col: string) {
     if (dragged.current) return;
+    if (col.startsWith("at:")) { setMsg({ kind: "warn", text: "That column comes straight from Airtable, so it cannot be sorted here yet." }); return; }
     if (sort === col) setDir(dir === "asc" ? "desc" : "asc");
     else { setSort(col); setDir(DEFAULT_DIR[col] || "asc"); }
     setPage(1);
@@ -295,13 +304,39 @@ export default function Tasks() {
 
   const today = todayStr();
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const cols = order.map((id) => COLUMNS.find((c) => c.id === id)!).filter(Boolean);
+  const allCols = useMemo(() => [
+    ...COLUMNS,
+    ...extra.map((f) => ({ id: "at:" + f.id, label: f.name, width: 150, at: f })),
+  ] as any[], [extra]);
+  const cols = order.map((id) => allCols.find((c) => c.id === id)!).filter(Boolean);
+
+  function atValue(f: any, v: any) {
+    if (v === null || v === undefined || v === "") return <span className="muted">-</span>;
+    if (f.type === "checkbox") return v ? "Yes" : <span className="muted">No</span>;
+    if (f.type === "singleSelect" || f.type === "multipleSelects") {
+      const colors = Object.fromEntries((f.choices || []).map((c: any) => [c.name, c.color]));
+      return <Chip v={Array.isArray(v) ? v.join(", ") : v} colors={colors} />;
+    }
+    if (f.type === "date") return String(v).slice(0, 10);
+    if (f.type === "dateTime" || f.type === "lastModifiedTime" || f.type === "createdTime") return when(v);
+    if (f.type === "url") return <a href={String(v)} target="_blank" rel="noreferrer">link</a>;
+    if (f.type === "multipleAttachments") return <span className="muted small">{(v as any[]).length} file(s)</span>;
+    if (f.type === "multipleRecordLinks") return <span className="muted small">{(v as any[]).length} linked</span>;
+    if (Array.isArray(v)) return <span className="small">{v.map((x: any) => (x && typeof x === "object" ? x.name : x)).join(", ")}</span>;
+    if (v && typeof v === "object") return <span className="small">{String(v.name ?? "")}</span>;
+    const txt = String(v).replace(/<[^>]*>/g, "");
+    return <div className="cellclip" title={txt.length > 90 ? txt : undefined}>{txt}</div>;
+  }
 
   function cell(id: string, t: any) {
+    if (id.startsWith("at:")) {
+      const f = extra.find((x) => "at:" + x.id === id);
+      return <td key={id} className="small">{f ? atValue(f, t.data?.[f.id]) : null}</td>;
+    }
     switch (id) {
       case "closed":
         return <td key={id} className="tick">
-          <input type="checkbox" checked={!!t.closed} title={t.closed ? "Reopen this task" : "Mark this task done"} onChange={() => toggleClosed(t)} />
+          <input type="checkbox" checked={!!t.closed} title={t.closed ? "Reopen this task" : "Mark this task done"} onChange={(e) => toggleClosed(t, e)} />
         </td>;
       case "priority":
         return <td key={id} className="small"><Chip v={t.priority} colors={choices[CF.taskPriority]} /></td>;
@@ -391,22 +426,24 @@ export default function Tasks() {
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             <span className="muted small">Click a heading to sort. Drag a heading to move the column.</span>
             <div className="ms" ref={pickerBox}>
-              <button className="btn sm" onClick={() => setPicker(!picker)}>Columns ({cols.length}/{COLUMNS.length})</button>
+              <button className="btn sm" onClick={() => setPicker(!picker)}>Columns ({cols.length}/{allCols.length})</button>
               {picker ? (
                 <div className="mspanel" style={{ right: 0, left: "auto" }}>
                   <div className="msrow">
-                    <button className="btn ghost sm" onClick={() => persist(COLUMNS.map((c) => c.id))}>Show all</button>
+                    <button className="btn ghost sm" onClick={() => persist(allCols.map((c: any) => c.id))}>Show all</button>
                     <button className="btn ghost sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset</button>
                     <div className="spacer" />
                     <button className="btn ghost sm" onClick={() => setPicker(false)}>Done</button>
                   </div>
                   <div className="mslist">
-                    {COLUMNS.map((c) => (
+                    {allCols.map((c: any) => (
                       <label key={c.id} className="msitem">
                         <input type="checkbox" checked={order.indexOf(c.id) >= 0}
                           onChange={() => persist(order.indexOf(c.id) >= 0 ? order.filter((x) => x !== c.id) : [...order, c.id])} />
                         <span>{c.label}</span>
-                        {order.indexOf(c.id) < 0 ? <span className="muted small" style={{ marginLeft: "auto" }}>hidden</span> : null}
+                        <span className="muted small" style={{ marginLeft: "auto" }}>
+                          {order.indexOf(c.id) < 0 ? "hidden" : c.at ? "Airtable" : ""}
+                        </span>
                       </label>
                     ))}
                   </div>

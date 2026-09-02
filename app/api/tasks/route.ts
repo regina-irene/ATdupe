@@ -52,7 +52,7 @@ export async function GET(req: Request) {
 
     const rows = await q(
       `select id, airtable_id, client_name, case_name, task, status, priority, who, ord, closed,
-              to_char(due_date,'YYYY-MM-DD') as due_date, link, updated_at, at_modified
+              to_char(due_date,'YYYY-MM-DD') as due_date, link, updated_at, at_modified, data
          from tasks ${sql} order by ${ord} limit ${pageSize} offset ${(page - 1) * pageSize}`,
       params
     );
