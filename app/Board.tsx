@@ -8,6 +8,7 @@ import RowSize from "./RowSize";
 import Linkify, { labelFor } from "./Linkify";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 import SyncButton from "./SyncButton";
+import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "./BulkBar";
 
 function today() {
   const d = new Date();
@@ -95,6 +96,56 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   // when the token cannot read the base schema.
   const kinds = useOptions(CF.timeKind, KINDS);
   const firms = useOptions(CF.timeFirm, FIRMS);
+  const pick = useSelection<number>();
+  const [bulking, setBulking] = useState(false);
+  // Only Type, Firm, Who, Case, Hours, Date and Billed make sense to set on a
+  // batch. The entry text itself is per-row, so it is left out on purpose.
+  const BULK_FIELDS: BulkField[] = [
+    { id: "kind", label: "Type", options: kinds, clearable: true },
+    { id: "firm", label: "Firm", options: firms, clearable: true },
+    { id: "user_name", label: "Who", kind: "text" },
+    { id: "case_name", label: "Case", kind: "text" },
+    { id: "duration", label: "Hours", kind: "number" },
+    { id: "entry_date", label: "Date", kind: "date" },
+    { id: "billed", label: "Billed", kind: "checkbox" },
+  ];
+
+  async function bulkApply(fieldId: string, value: any) {
+    setBulking(true); setMsg(null);
+    try {
+      const r = await fetch("/api/entries/bulk", {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: pick.sel, patch: { [fieldId]: value } }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      const label = BULK_FIELDS.find((f) => f.id === fieldId)?.label || fieldId;
+      setMsg({ kind: "ok", text: `${label} set on ${j.updated} ${j.updated === 1 ? "entry" : "entries"}. They go to Airtable at the next sync.` });
+      pick.clear();
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setBulking(false);
+  }
+
+  async function bulkDelete() {
+    const n = pick.sel.length;
+    if (!confirm(`Delete ${n} time ${n === 1 ? "entry" : "entries"}? They are removed from Airtable as well, and this cannot be undone.`)) return;
+    setBulking(true); setMsg(null);
+    try {
+      const r = await fetch("/api/entries/bulk", {
+        method: "DELETE", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: pick.sel }),
+      });
+      const j = await r.json();
+      if (j.error && !j.deleted) throw new Error(j.error);
+      setMsg(j.error
+        ? { kind: "err", text: j.error }
+        : { kind: "ok", text: `Deleted ${j.deleted} here and in Airtable.` });
+      pick.clear();
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setBulking(false);
+  }
   const cw = useColWidths("efl.time.widths");
   const loadViews = useCallback(() => {
     fetch("/api/views?page=time").then((r) => r.json())
@@ -537,7 +588,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <SyncButton busy={syncing} onClick={syncNow} />
+            <SyncButton busy={syncing} onClick={syncNow} syncKey="time" />
           </div>
         </div>
         <div className="row noprint" style={{ marginBottom: 9 }}>
@@ -567,23 +618,27 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
           )}
         </div>
 
+        <BulkBar count={pick.count} fields={BULK_FIELDS} busy={bulking} noun="entries"
+          onApply={bulkApply} onClear={pick.clear} onDelete={bulkDelete} />
+
         <div className="tablewrap">
           <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
+              <SelectAllTh ids={rows.map((r: any) => r.id)} sel={pick.sel} setAll={pick.setAll} />
               {cols.map((c) => <Th key={c.id} id={c.id} label={c.label} w={c.width} />)}
               <th className="noprint" style={{ width: 58 }}></th>
             </tr></thead>
             <tbody>
-              {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
-                : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">No entries match these filters.</td></tr>)
+              {loading ? (<tr><td colSpan={cols.length + 2} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={cols.length + 2} className="muted">No entries match these filters.</td></tr>)
 : groups.map((g) => (
                 <Fragment key={"g" + g.key}>
                   {groupDef ? (
-                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 1} extra={g.items.reduce((n: number, x: any) => n + Number(x.duration || 0), 0).toFixed(2) + " hrs"}
+                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 2} extra={g.items.reduce((n: number, x: any) => n + Number(x.duration || 0), 0).toFixed(2) + " hrs"}
                       collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
                   ) : null}
                   {folded[g.key] ? null : g.items.map((r) => editing === r.id ? (
-                <tr key={r.id}><td colSpan={cols.length + 1}>
+                <tr key={r.id}><td colSpan={cols.length + 2}>
                   <div className="grid g4">
                     <div><label className="f">Date</label><input type="date" value={draft.entry_date || ""} onChange={(e) => setDraft({ ...draft, entry_date: e.target.value })} /></div>
                     <div style={{ gridColumn: "span 2" }}><label className="f">Case</label><CaseCombo value={draft.case_name || ""} onChange={(v) => setDraft({ ...draft, case_name: v })} /></div>
@@ -603,7 +658,8 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
                   </div>
                 </td></tr>
               ) : (
-                <tr key={r.id}>
+                <tr key={r.id} className={pick.has(r.id) ? "picked" : ""}>
+                  <SelectTd id={r.id} has={pick.has} toggle={pick.toggle} />
                   {cols.map((c) => cell(c.id, r))}
                   <td className="noprint"><button className="btn ghost sm" onClick={() => { setEditing(r.id); setDraft({ entry_date: d10(r.entry_date), case_name: r.case_name, time_entry: r.time_entry, duration: r.duration, kind: r.kind, firm: r.firm, user_name: r.user_name }); }}>Edit</button></td>
                 </tr>

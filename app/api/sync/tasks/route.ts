@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, q, ensureSchema, ymd, setState} from "../../../../lib/db";
+import { db, q, ensureSchema, ymd, setState, stampSync } from "../../../../lib/db";
 import { authorize } from "../../../../lib/auth";
 import { at, chunk, sleep, plain, BASE, TASK_TABLE, TF } from "../../../../lib/airtable";
 
@@ -145,6 +145,7 @@ async function run() {
   // Let the next page load pick up any Airtable colour changes.
   try { await setState("choice_colors_at", "0"); } catch {}
 
+  await stampSync("tasks");
   return { ok: true, pulled, pushed_new: pushedNew, pushed_upd: pushedUpd, ms };
 }
 

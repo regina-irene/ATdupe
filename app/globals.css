@@ -547,3 +547,19 @@ table.data td.edit select,table.data td.edit input,table.data td.edit textarea{w
 .btn.sync-at svg{flex:0 0 auto;display:block}
 .btn.sync-at.is-busy svg{animation:sync-at-spin 1.1s linear infinite}
 @keyframes sync-at-spin{to{transform:rotate(360deg)}}
+
+/* Bulk edit: the checkbox column, the picked row tint, and the bar that
+   appears above a table once something is ticked. */
+td.pickcell,th.pickcell{text-align:center;padding-left:6px;padding-right:6px}
+td.pickcell input,th.pickcell input{cursor:pointer;width:15px;height:15px;accent-color:var(--accent)}
+tr.picked>td{background:color-mix(in srgb,var(--accent) 11%,transparent)}
+.bulkbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:9px;padding:9px 12px;
+  border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:var(--rs);
+  background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+.bulkbar b{font-size:13px;white-space:nowrap}
+.bulkbar .f{margin:0;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.bulkbar .sep{width:1px;height:20px;background:var(--line)}
+.bulkbar select,.bulkbar input{margin:0}
+/* Last-sync stamp, sitting under or beside the Sync Airtable button. */
+.syncwrap{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px}
+.syncwrap .stamp{font-size:10.5px;color:var(--muted);white-space:nowrap;padding-left:2px}

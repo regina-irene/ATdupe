@@ -88,7 +88,7 @@ export default function BoardDetail({ base }: { base: string }) {
           </div>
           <div className="spacer" />
           <button className="btn sm" onClick={() => setLinking(!linking)}>{linking ? "Close" : "Link to a case"}</button>
-          <SyncButton busy={busy === "all"} onClick={syncAll} label="Sync every table" busyLabel="Syncing all..." />
+          <SyncButton busy={busy === "all"} onClick={syncAll} label="Sync every table" busyLabel="Syncing all..." syncPrefix={"b:" + base + ":"} />
         </div>
         {linking ? (
           <div className="row" style={{ marginTop: 9 }}>

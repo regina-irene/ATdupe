@@ -552,7 +552,7 @@ export default function Boards() {
               onClick={() => { const v = !fullText; setFullText(v); try { localStorage.setItem("efl.boards.fulltext", v ? "1" : "0"); } catch {} }}>
               {fullText ? "Condense updates" : "Full updates"}
             </button>
-            <SyncButton busy={busy === "all"} onClick={syncAll} label="Sync all boards" busyLabel="Syncing all..." />
+            <SyncButton busy={busy === "all"} onClick={syncAll} label="Sync all boards" busyLabel="Syncing all..." syncPrefix="b:" />
           </div>
         </div>
 

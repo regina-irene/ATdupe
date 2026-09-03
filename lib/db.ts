@@ -35,6 +35,19 @@ export async function setState(key: string, value: string | null) {
   await q("insert into sync_state (key,value,updated_at) values ($1,$2,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [key, value]);
 }
 
+// When each board last finished a sync, so every Sync Airtable button can say
+// so. One row per board key in sync_state.
+export async function stampSync(key: string) {
+  try { await setState("last_sync_" + key, new Date().toISOString()); } catch {}
+}
+
+export async function lastSyncs(): Promise<Record<string, string>> {
+  const r = await q("select key, value from sync_state where key like 'last_sync_%'");
+  const out: Record<string, string> = {};
+  for (const row of r as any[]) out[String(row.key).slice(10)] = row.value;
+  return out;
+}
+
 let ready = false;
 
 const STATEMENTS = [

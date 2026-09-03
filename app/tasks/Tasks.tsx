@@ -14,6 +14,7 @@ import { seasonFor } from "../../lib/seasons";
 import Rules from "./Rules";
 import { CF } from "../../lib/constants";
 import SyncButton from "../SyncButton";
+import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "../BulkBar";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
 const todayStr = () => {
@@ -114,6 +115,53 @@ export default function Tasks() {
   const statuses = useOptions(CF.taskStatus, meta.statuses);
   const priorities = useOptions(CF.taskPriority, meta.priorities);
   const whos = useOptions(CF.taskWho, TASK_USERS);
+  const pick = useSelection<number>();
+  const [bulking, setBulking] = useState(false);
+  const BULK_FIELDS: BulkField[] = [
+    { id: "status", label: "Status", options: statuses, clearable: true },
+    { id: "priority", label: "Priority", options: priorities, clearable: true },
+    { id: "who", label: "Who", options: whos, clearable: true },
+    { id: "due_date", label: "Due date", kind: "date" },
+    { id: "case_name", label: "Case", kind: "text" },
+    { id: "client_name", label: "Client", kind: "text" },
+    { id: "closed", label: "Closed", kind: "checkbox" },
+  ];
+
+  async function bulkApply(fieldId: string, value: any) {
+    setBulking(true); setMsg(null);
+    try {
+      const r = await fetch("/api/tasks/bulk", {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: pick.sel, patch: { [fieldId]: value } }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      const label = BULK_FIELDS.find((f) => f.id === fieldId)?.label || fieldId;
+      const rules = (j.fired || []).length ? " Automations ran: " + j.fired.join("; ") + "." : "";
+      setMsg({ kind: "ok", text: `${label} set on ${j.updated} ${j.updated === 1 ? "task" : "tasks"}.${rules} They go to Airtable at the next sync.` });
+      pick.clear();
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setBulking(false);
+  }
+
+  async function bulkDelete() {
+    const n = pick.sel.length;
+    if (!confirm(`Delete ${n} ${n === 1 ? "task" : "tasks"} from Chambers? Airtable still has them until you delete them there.`)) return;
+    setBulking(true); setMsg(null);
+    try {
+      const r = await fetch("/api/tasks/bulk", {
+        method: "DELETE", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: pick.sel }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      setMsg({ kind: "ok", text: `Removed ${j.deleted} from Chambers.` });
+      pick.clear();
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setBulking(false);
+  }
   const [leaving, setLeaving] = useState<number | null>(null);
   const [cellEdit, setCellEdit] = useState<{ id: number; field: string } | null>(null);
   const [showRules, setShowRules] = useState(false);
@@ -521,13 +569,17 @@ export default function Tasks() {
             <ParadeControls />
             <button className="btn sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <SyncButton busy={syncing} onClick={syncNow} />
+            <SyncButton busy={syncing} onClick={syncNow} syncKey="tasks" />
           </div>
         </div>
+
+        <BulkBar count={pick.count} fields={BULK_FIELDS} busy={bulking} noun="tasks"
+          onApply={bulkApply} onClear={pick.clear} onDelete={bulkDelete} />
 
         <div className="tablewrap">
           <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
+              <SelectAllTh ids={rows.map((r: any) => r.id)} sel={pick.sel} setAll={pick.setAll} />
               {cols.map((c) => (
                 <th key={c.id} style={cw.widthOf(c.id, c.width)}
                     className={"sortable" + (overId === c.id ? " over" : "") + (dragId === c.id ? " dragging" : "")}
@@ -547,16 +599,16 @@ export default function Tasks() {
               <th className="noprint" style={{ width: 62 }}></th>
             </tr></thead>
             <tbody>
-              {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
-                : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">No tasks match these filters.</td></tr>)
+              {loading ? (<tr><td colSpan={cols.length + 2} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={cols.length + 2} className="muted">No tasks match these filters.</td></tr>)
 : groups.map((g) => (
                 <Fragment key={"g" + g.key}>
                   {groupDef ? (
-                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 1}
+                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 2}
                       collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
                   ) : null}
                   {folded[g.key] ? null : g.items.map((t) => editing === t.id ? (
-                <tr key={t.id}><td colSpan={cols.length + 1}>
+                <tr key={t.id}><td colSpan={cols.length + 2}>
                   <div className="grid g4">
                     <div><label className="f">Status</label>
                       <select value={draft.status || ""} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
@@ -589,7 +641,9 @@ export default function Tasks() {
               ) : (
                 <tr key={t.id} className={prioClass(t.priority)
                   + (!t.closed && t.due_date && d10(t.due_date) < today ? " overdue" : "")
-                  + (leaving === t.id ? " leaving" : "")} data-task={t.id}>
+                  + (leaving === t.id ? " leaving" : "")
+                  + (pick.has(t.id) ? " picked" : "")} data-task={t.id}>
+                  <SelectTd id={t.id} has={pick.has} toggle={pick.toggle} />
                   {cols.map((c) => cell(c.id, t))}
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => { setEditing(t.id); setDraft({ status: t.status, priority: t.priority, who: t.who, due_date: d10(t.due_date), task: t.task }); }}>Edit</button>

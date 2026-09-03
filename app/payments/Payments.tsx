@@ -7,6 +7,7 @@ import { Resizer, useColWidths } from "../colwidths";
 import RowSize from "../RowSize";
 import { CF } from "../../lib/constants";
 import SyncButton from "../SyncButton";
+import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "../BulkBar";
 
 const money = (v: any) =>
   v === null || v === undefined || v === "" ? "" :
@@ -88,6 +89,35 @@ export default function Payments() {
   const methods = useOptions(CF.payMethod, meta.methods);
   const types = useOptions(CF.payType, meta.types);
   const cleareds = useOptions(CF.payCleared, meta.cleared);
+  const rowsel = useSelection<number>();
+  const [bulking, setBulking] = useState(false);
+  // Airtable works out the splits and the Year fields, so they are not here.
+  const BULK_FIELDS: BulkField[] = [
+    { id: "kind", label: "Type of payment", options: kinds, clearable: true },
+    { id: "method", label: "Payment method", options: methods, clearable: true },
+    { id: "case_type", label: "Case type", options: types, clearable: true },
+    { id: "cleared", label: "Cleared?", options: cleareds, clearable: true },
+    { id: "case_name", label: "Case", kind: "text" },
+    { id: "pay_date", label: "Payment date", kind: "date" },
+    { id: "amount", label: "Amount", kind: "number" },
+  ];
+
+  async function bulkApply(fieldId: string, value: any) {
+    setBulking(true); setMsg(null);
+    try {
+      const r = await fetch("/api/payments/bulk", {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: rowsel.sel, patch: { [fieldId]: value } }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      const label = BULK_FIELDS.find((f) => f.id === fieldId)?.label || fieldId;
+      setMsg({ kind: "ok", text: `${label} set on ${j.updated} ${j.updated === 1 ? "payment" : "payments"}. They go to Airtable at the next sync.` });
+      rowsel.clear();
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setBulking(false);
+  }
   const [groupId, setGroupId] = useState("");
   const [folded, setFolded] = useState<Record<string, boolean>>({});
 
@@ -350,13 +380,17 @@ export default function Payments() {
             </div>
             <button className="btn sm" onClick={() => { persist(DEFAULT_ORDER); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <SyncButton busy={syncing} onClick={syncNow} />
+            <SyncButton busy={syncing} onClick={syncNow} syncKey="payments" />
           </div>
         </div>
+
+        <BulkBar count={rowsel.count} fields={BULK_FIELDS} busy={bulking} noun="payments"
+          onApply={bulkApply} onClear={rowsel.clear} />
 
         <div className="tablewrap">
           <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
+              <SelectAllTh ids={rows.map((r: any) => r.id)} sel={rowsel.sel} setAll={rowsel.setAll} />
               {cols.map((c) => (
                 <th key={c.id} style={cw.widthOf(c.id, c.width)}
                     className={(SORTABLE.indexOf(c.id) >= 0 ? "sortable" : "") + (c.money ? " money" : "") + (overId === c.id ? " over" : "") + (dragId === c.id ? " dragging" : "")}
@@ -375,16 +409,16 @@ export default function Payments() {
               <th className="noprint" style={{ width: 62 }}></th>
             </tr></thead>
             <tbody>
-              {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
-                : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">No payments match these filters.</td></tr>)
+              {loading ? (<tr><td colSpan={cols.length + 2} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={cols.length + 2} className="muted">No payments match these filters.</td></tr>)
 : groups.map((g) => (
                 <Fragment key={"g" + g.key}>
                   {groupDef ? (
-                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 1} extra={money(g.items.reduce((n: number, x: any) => n + Number(x.amount || 0), 0))}
+                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 2} extra={money(g.items.reduce((n: number, x: any) => n + Number(x.amount || 0), 0))}
                       collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
                   ) : null}
                   {folded[g.key] ? null : g.items.map((p) => editing === p.id ? (
-                <tr key={p.id}><td colSpan={cols.length + 1}>
+                <tr key={p.id}><td colSpan={cols.length + 2}>
                   <div className="grid g4">
                     <div><label className="f">Payment date</label><input type="date" value={draft.pay_date || ""} onChange={(e) => setDraft({ ...draft, pay_date: e.target.value })} /></div>
                     <div><label className="f">Amount</label><input type="number" step="0.01" value={draft.amount ?? ""} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} /></div>
@@ -427,7 +461,8 @@ export default function Payments() {
                   </div>
                 </td></tr>
               ) : (
-                <tr key={p.id}>
+                <tr key={p.id} className={rowsel.has(p.id) ? "picked" : ""}>
+                  <SelectTd id={p.id} has={rowsel.has} toggle={rowsel.toggle} />
                   {cols.map((c) => cell(c.id, p))}
                   <td className="noprint">
                     <button className="btn ghost sm" onClick={() => {

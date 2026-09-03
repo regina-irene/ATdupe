@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, q, ensureSchema, getState, setState, ymd } from "../../../../lib/db";
+import { db, q, ensureSchema, getState, setState, stampSync, ymd } from "../../../../lib/db";
 import { authorize } from "../../../../lib/auth";
 import { at, chunk, sleep, BASE, TIME_TABLE, F } from "../../../../lib/airtable";
 
@@ -90,6 +90,7 @@ async function backfill() {
   // Let the next page load pick up any Airtable colour changes.
   try { await setState("choice_colors_at", "0"); } catch {}
 
+  await stampSync("time");
   return { ok: true, mode: "backfill", done, pulled: thisRun, total_pulled: pulled, pushed_new: 0, pushed_upd: 0, fixed_dates: 0, ms: Date.now() - started };
 }
 
@@ -184,6 +185,7 @@ async function run() {
 
   const ms = Date.now() - started;
   await q("insert into sync_log (kind, pulled, pushed_new, pushed_upd, fixed_dates, ms) values ('time',$1,$2,$3,$4,$5)", [pulled, pushedNew, pushedUpd, fixed, ms]);
+  await stampSync("time");
   return { ok: true, mode: "incremental", done: true, pulled, pushed_new: pushedNew, pushed_upd: pushedUpd, fixed_dates: fixed, ms };
 }
 

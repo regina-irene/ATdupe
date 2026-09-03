@@ -1,4 +1,5 @@
 "use client";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // Airtable's mark: three coloured bars plus the blue slab. Drawn inline so it
 // needs no network request and picks up the button's size.
@@ -13,18 +14,83 @@ export function AirtableLogo({ size = 20 }: { size?: number }) {
   );
 }
 
+// Actual date and time, never "19h ago".
+function stampOf(iso?: string | null): string {
+  if (!iso) return "Never synced";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "Never synced";
+  const day = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return "Last synced " + day + ", " + time;
+}
+
+// One shared fetch of every board's last-sync time, so a page holding several
+// sync buttons asks once. `bump` invalidates it after a sync finishes.
+let cache: Record<string, string> | null = null;
+let inflight: Promise<Record<string, string>> | null = null;
+const watchers = new Set<(m: Record<string, string>) => void>();
+
+function fetchLast(force = false): Promise<Record<string, string>> {
+  if (force) { cache = null; inflight = null; }
+  if (cache) return Promise.resolve(cache);
+  if (!inflight) {
+    inflight = fetch("/api/sync/last")
+      .then((r) => r.json())
+      .then((j) => {
+        cache = j?.last || {};
+        watchers.forEach((w) => w(cache!));
+        return cache!;
+      })
+      .catch(() => ({}))
+      .finally(() => { inflight = null; });
+  }
+  return inflight;
+}
+
+export function useLastSync(key?: string, prefix?: string) {
+  const [map, setMap] = useState<Record<string, string>>(cache || {});
+  useEffect(() => {
+    watchers.add(setMap);
+    fetchLast();
+    return () => { watchers.delete(setMap); };
+  }, []);
+  const refresh = useCallback(() => { fetchLast(true); }, []);
+  // A button that syncs several boards at once reports the most recent of them.
+  let at: string | undefined = key ? map[key] : undefined;
+  if (!at && prefix) {
+    for (const k of Object.keys(map)) {
+      if (k.indexOf(prefix) !== 0) continue;
+      if (!at || map[k] > at) at = map[k];
+    }
+  }
+  return { at, refresh };
+}
+
 // The one Sync Airtable control, used on every board so it looks and behaves
-// the same everywhere.
+// the same everywhere. `syncKey` is the board's key in sync_state
+// (time, tasks, payments, status, clients, or b:<baseId>:<tableId>) and drives
+// the last-synced line under the button.
 export default function SyncButton({
-  busy, onClick, label = "Sync Airtable", busyLabel = "Syncing...", title,
+  busy, onClick, label = "Sync Airtable", busyLabel = "Syncing...", title, syncKey, syncPrefix, stamp = true,
 }: {
   busy?: boolean;
   onClick: () => void;
   label?: string;
   busyLabel?: string;
   title?: string;
+  syncKey?: string;
+  syncPrefix?: string;
+  stamp?: boolean;
 }) {
-  return (
+  const { at, refresh } = useLastSync(syncKey, syncPrefix);
+  const was = useRef(!!busy);
+  // Re-read the stamp the moment a sync finishes.
+  useEffect(() => {
+    if (was.current && !busy) refresh();
+    was.current = !!busy;
+  }, [busy, refresh]);
+
+  const btn = (
     <button
       type="button"
       className={"btn sync-at" + (busy ? " is-busy" : "")}
@@ -35,5 +101,15 @@ export default function SyncButton({
       <AirtableLogo size={22} />
       <span>{busy ? busyLabel : label}</span>
     </button>
+  );
+
+  if (!stamp) return btn;
+  return (
+    <div className="syncwrap">
+      {btn}
+      <span className="stamp" title={at ? new Date(at).toString() : "This board has not been synced yet"}>
+        {busy ? "Syncing now..." : stampOf(at)}
+      </span>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, q, ensureSchema } from "../../../../../lib/db";
+import { db, q, ensureSchema, stampSync } from "../../../../../lib/db";
 import { authorize } from "../../../../../lib/auth";
 import { at, chunk, sleep } from "../../../../../lib/airtable";
 import { resolve, schemaFor, coerce } from "../../../../../lib/mirror";
@@ -117,6 +117,7 @@ async function run(key: string, fresh = false) {
     await q("update client_boards set last_sync = now(), last_result = $2 where base_id = $1",
       [cfg.base, `${pulled} pulled, ${pushedNew} new, ${pushedUpd} updated`]);
   }
+  await stampSync(key);
   return { ok: true, pulled, pushed_new: pushedNew, pushed_upd: pushedUpd, ms, problems: problems.slice(0, 3), not_sent: toUpdate.length - pushedUpd };
 }
 

@@ -7,6 +7,7 @@ import { Resizer, useColWidths } from "./colwidths";
 import RowSize from "./RowSize";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 import SyncButton from "./SyncButton";
+import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "./BulkBar";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
 type Cond = { fid: string; op: string; val: any };
@@ -44,6 +45,8 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
+  const pick = useSelection<number>();
+  const [bulking, setBulking] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const [q, setQ] = useState("");
@@ -436,8 +439,38 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
 
   const cols = shown.map((id) => byId.get(id)!).filter(Boolean);
   const linksBoards = boardKey === "status";
-  const span = cols.length + 1 + (linksBoards ? 1 : 0);
+  const span = cols.length + 2 + (linksBoards ? 1 : 0);
   const editable = fields.filter((f) => f.writable);
+
+  // Which of this board's own writable fields can be set on a batch. Long text
+  // is left out on purpose: pasting the same paragraph onto many records is
+  // almost never what someone means.
+  const BULK_KINDS: Record<string, BulkField["kind"]> = {
+    checkbox: "checkbox", number: "number", currency: "number", percent: "number",
+    duration: "number", rating: "number", date: "date", dateTime: "date",
+  };
+  const BULK_FIELDS: BulkField[] = editable
+    .filter((f) => f.type !== "multilineText" && f.type !== "richText")
+    .map((f) => (f.choices && f.choices.length
+      ? { id: f.id, label: f.name, options: f.choices.map((c) => c.name), clearable: true }
+      : { id: f.id, label: f.name, kind: BULK_KINDS[f.type] || "text" }));
+
+  async function bulkApply(fieldId: string, value: any) {
+    setBulking(true); setMsg(null);
+    try {
+      const r = await fetch("/api/mirror/" + boardKey + "/bulk", {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: pick.sel, data: { [fieldId]: value } }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      const label = BULK_FIELDS.find((f) => f.id === fieldId)?.label || fieldId;
+      setMsg({ kind: "ok", text: `${label} set on ${j.updated} ${j.updated === 1 ? "record" : "records"}. They go to Airtable at the next sync.` });
+      pick.clear();
+      load();
+    } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
+    setBulking(false);
+  }
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const pickerList = term ? fields.filter((f) => f.name.toLowerCase().indexOf(term.toLowerCase()) >= 0) : fields;
 
@@ -595,13 +628,17 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <SyncButton busy={syncing} onClick={syncNow} />
+            <SyncButton busy={syncing} onClick={syncNow} syncKey={boardKey} />
           </div>
         </div>
+
+        <BulkBar count={pick.count} fields={BULK_FIELDS} busy={bulking} noun="records"
+          onApply={bulkApply} onClear={pick.clear} />
 
         <div className="tablewrap">
           <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
+              <SelectAllTh ids={rows.map((r) => r.id)} sel={pick.sel} setAll={pick.setAll} />
               {cols.map((f) => (
                 <th key={f.id} style={cw.widthOf(f.id)} className={"sortable" + (overId === f.id ? " over" : "") + (dragId === f.id ? " dragging" : "")}
                     draggable
@@ -644,7 +681,8 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                   </div>
                 </td></tr>
               ) : (
-                <tr key={r.id}>
+                <tr key={r.id} className={pick.has(r.id) ? "picked" : ""}>
+                  <SelectTd id={r.id} has={pick.has} toggle={pick.toggle} />
                   {cols.map((f) => {
                     const open = cellEdit?.id === r.id && cellEdit.fid === f.id;
                     if (!f.writable) return <td key={f.id} className="small">{show(f, r.data?.[f.id])}</td>;
