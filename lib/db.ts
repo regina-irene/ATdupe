@@ -188,7 +188,12 @@ const STATEMENTS = [
      responses text,
      payload jsonb,
      received_at timestamptz not null default now())`,
+  `alter table questionnaire_responses add column if not exists seen boolean not null default false`,
   `create index if not exists qr_case_idx on questionnaire_responses (lower(case_name), lower(party), received_at desc)`,
+  `create table if not exists questionnaire_drafts (
+     token text primary key,
+     data jsonb not null default '{}'::jsonb,
+     saved_at timestamptz not null default now())`,
   `create table if not exists sync_log (id bigserial primary key, ran_at timestamptz not null default now(), kind text default 'time', pulled int default 0, pushed_new int default 0, pushed_upd int default 0, fixed_dates int default 0, ms int default 0, error text)`,
   `alter table sync_log add column if not exists kind text default 'time'`,
   `create table if not exists sync_state (key text primary key, value text, updated_at timestamptz not null default now())`,

@@ -9,7 +9,7 @@ type Row = {
 type Resp = {
   id: number; case_name: string; party: string; person_name: string | null;
   email: string | null; phone: string | null; submitted_text: string | null;
-  responses: string | null; received_at: string;
+  responses: string | null; received_at: string; seen: boolean;
 };
 
 const when = (v: any) => {
@@ -74,6 +74,14 @@ export default function Questionnaires() {
     [resps, caseName]);
   const respParties = useMemo(
     () => [...new Set(caseResps.map((r) => r.party))].sort(), [caseResps]);
+  const unreadFor = (name: string) =>
+    resps.filter((r) => !r.seen && r.case_name.toLowerCase() === name.toLowerCase()).length;
+
+  useEffect(() => {
+    if (tab !== "answers") return;
+    const ids = caseResps.filter((r) => !r.seen).map((r) => r.id);
+    if (ids.length) markSeen(ids);
+  }, [tab, caseResps]);
   const link = (t: string | null) =>
     t ? (typeof window === "undefined" ? "" : window.location.origin) + "/q/" + t : "";
 
@@ -136,6 +144,15 @@ export default function Questionnaires() {
     setMsg({ kind: "ok", text: `Saved ${keep.length}.` });
     setBusy(false);
     load();
+  }
+
+  // Opening a case's answers is what counts as having seen them.
+  async function markSeen(ids: number[]) {
+    if (!ids.length) return;
+    await fetch("/api/questionnaires/responses", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids }),
+    }).catch(() => {});
+    setResps((cur) => cur.map((r) => (ids.indexOf(r.id) >= 0 ? { ...r, seen: true } : r)));
   }
 
   async function remove(r: Row) {
@@ -225,6 +242,7 @@ export default function Questionnaires() {
             {cases.map((n) => (
               <button key={n} className={"chip " + (caseName === n ? "on" : "")} onClick={() => { setCaseName(n); setCompare(false); }}>
                 {n} <span className="muted">{rows.filter((r) => r.case_name === n).length}</span>
+                {unreadFor(n) ? <span className="navbadge">{unreadFor(n)}</span> : null}
               </button>
             ))}
           </div>
@@ -256,6 +274,7 @@ export default function Questionnaires() {
             <div className="seg">
               <button className={tab === "answers" ? "on" : ""} onClick={() => setTab("answers")}>
                 Answers {caseResps.length ? "(" + caseResps.length + ")" : ""}
+                {unreadFor(caseName) ? <span className="navbadge">{unreadFor(caseName)}</span> : null}
               </button>
               <button className={tab === "form" ? "on" : ""} onClick={() => setTab("form")}>The form</button>
             </div>
@@ -286,9 +305,9 @@ export default function Questionnaires() {
                 {respParties.map((pt) => {
                   const latest = caseResps.filter((r) => r.party === pt)[0];
                   return (
-                    <div className="qnpane" data-party={partyClass(pt)} key={pt}>
+                    <div className={"qnpane" + (latest.seen ? "" : " unseen")} data-party={partyClass(pt)} key={pt}>
                       <div className="partyhead">
-                        {pt}
+                        {pt}{!latest.seen ? <span className="newflag">new</span> : null}
                         <span className="muted small" style={{ float: "right", textTransform: "none", letterSpacing: 0 }}>
                           {latest.submitted_text || when(latest.received_at)}
                         </span>

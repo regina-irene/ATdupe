@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import ThemeMenu from "./ThemeMenu";
 
@@ -33,6 +33,19 @@ function pageKey(p: string) {
 
 export default function Nav({ name }: { name?: string }) {
   const path = usePathname() || "/";
+  const [unread, setUnread] = useState(0);
+
+  // A questionnaire coming back is worth interrupting for, so the tab says so.
+  useEffect(() => {
+    let live = true;
+    const check = () => fetch("/api/questionnaires/unread")
+      .then((r) => r.json()).then((j) => { if (live) setUnread(j.unread || 0); }).catch(() => {});
+    check();
+    const t = setInterval(check, 60000);
+    const vis = () => { if (!document.hidden) check(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { live = false; clearInterval(t); document.removeEventListener("visibilitychange", vis); };
+  }, [path]);
   const key = pageKey(path);
   const group = key === "settings" ? "setup"
     : ["dashboard", "tasks", "payments", "cases", "clients", "boards", "gal", "galpay", "qn", "setup"].indexOf(key) >= 0 ? key : "time";
@@ -49,8 +62,12 @@ export default function Nav({ name }: { name?: string }) {
     } catch {}
   }, [key]);
 
-  const top = (href: string, label: string, id: string) => (
-    <a key={id} href={href} className={group === id ? "on" : ""}>{label}{group === id ? <i /> : null}</a>
+  const top = (href: string, label: string, id: string, badge?: number) => (
+    <a key={id} href={href} className={group === id ? "on" : ""}>
+      {label}
+      {badge ? <span className="navbadge" title={badge + " new"}>{badge}</span> : null}
+      {group === id ? <i /> : null}
+    </a>
   );
 
   return (
@@ -71,7 +88,7 @@ export default function Nav({ name }: { name?: string }) {
           {top("/boards", "Client Boards", "boards")}
           {top("/gal", "GAL Status", "gal")}
           {top("/gal-payments", "GAL Payments", "galpay")}
-          {top("/questionnaires", "Questionnaires", "qn")}
+          {top("/questionnaires", "Questionnaires", "qn", unread)}
           {top("/setup", "Setup", "setup")}
         </nav>
         <div className="who">
