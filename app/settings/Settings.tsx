@@ -87,8 +87,9 @@ export default function Settings() {
     try {
       const j = await (await fetch("/api/choices/refresh", { method: "POST" })).json();
       if (j.error) throw new Error(j.error);
-      await fetch("/api/choices?refresh=1");
-      flash("Airtable colours and field names refreshed. Reload a board to see them.");
+      const c = await (await fetch("/api/choices?refresh=1")).json();
+      if (c.ok === false) flash(c.note || "Could not read the Airtable schema.");
+      else flash(`Refreshed ${c.choices || 0} colours across ${c.fields || 0} fields. Reload a board to see them.`);
     } catch (e: any) { flash("Could not refresh: " + e.message); }
     setBusy(false);
   }

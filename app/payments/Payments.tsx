@@ -1,11 +1,12 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MultiSelect from "../MultiSelect";
-import Chip, { useChoices } from "../Chip";
+import Chip, { useChoices, useOptions } from "../Chip";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { Resizer, useColWidths } from "../colwidths";
 import RowSize from "../RowSize";
 import { CF } from "../../lib/constants";
+import SyncButton from "../SyncButton";
 
 const money = (v: any) =>
   v === null || v === undefined || v === "" ? "" :
@@ -81,6 +82,12 @@ export default function Payments() {
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
   const choices = useChoices();
+  // Airtable is the source of the option lists; what is already stored
+  // locally is only the fallback.
+  const kinds = useOptions(CF.payKind, meta.kinds);
+  const methods = useOptions(CF.payMethod, meta.methods);
+  const types = useOptions(CF.payType, meta.types);
+  const cleareds = useOptions(CF.payCleared, meta.cleared);
   const [groupId, setGroupId] = useState("");
   const [folded, setFolded] = useState<Record<string, boolean>>({});
 
@@ -250,7 +257,7 @@ export default function Payments() {
               <div><label className="f">Cleared?</label>
                 <select value={form.cleared} onChange={(e) => setForm({ ...form, cleared: e.target.value })}>
                   <option value="">-</option>
-                  {meta.cleared.map((o) => <option key={o} value={o}>{o}</option>)}
+                  {cleareds.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
             </div>
@@ -258,19 +265,19 @@ export default function Payments() {
               <div><label className="f">Type of payment</label>
                 <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
                   <option value="">-</option>
-                  {meta.kinds.map((o) => <option key={o} value={o}>{o}</option>)}
+                  {kinds.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div><label className="f">Payment method</label>
                 <select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
                   <option value="">-</option>
-                  {meta.methods.map((o) => <option key={o} value={o}>{o}</option>)}
+                  {methods.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div><label className="f">Case type</label>
                 <select value={form.case_type} onChange={(e) => setForm({ ...form, case_type: e.target.value })}>
                   <option value="">-</option>
-                  {meta.types.map((o) => <option key={o} value={o}>{o}</option>)}
+                  {types.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div><label className="f">Notes</label><input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
@@ -288,12 +295,12 @@ export default function Payments() {
         <h2>Filters</h2>
         <div className="grid g4">
           <div><label className="f">Case contains</label><input type="search" value={caseQ} onChange={(e) => { setCaseQ(e.target.value); setPage(1); }} placeholder="e.g. Bunting" /></div>
-          {pick(kind, setKind, "Type of payment", meta.kinds, "All types")}
-          {pick(method, setMethod, "Payment method", meta.methods, "All methods")}
-          {pick(type, setType, "Case type", meta.types, "All case types")}
+          {pick(kind, setKind, "Type of payment", kinds, "All types")}
+          {pick(method, setMethod, "Payment method", methods, "All methods")}
+          {pick(type, setType, "Case type", types, "All case types")}
         </div>
         <div className="grid g4" style={{ marginTop: 7 }}>
-          {pick(cleared, setCleared, "Cleared?", meta.cleared, "Any")}
+          {pick(cleared, setCleared, "Cleared?", cleareds, "Any")}
           {pick(year, setYear, "Year", meta.years, "All years")}
           <div><label className="f">From</label><input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} /></div>
           <div><label className="f">To</label><input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} /></div>
@@ -343,7 +350,7 @@ export default function Payments() {
             </div>
             <button className="btn sm" onClick={() => { persist(DEFAULT_ORDER); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
+            <SyncButton busy={syncing} onClick={syncNow} />
           </div>
         </div>
 
@@ -387,7 +394,7 @@ export default function Payments() {
                     <div><label className="f">Cleared?</label>
                       <select value={draft.cleared || ""} onChange={(e) => setDraft({ ...draft, cleared: e.target.value })}>
                         <option value="">-</option>
-                        {meta.cleared.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {cleareds.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     </div>
                   </div>
@@ -395,19 +402,19 @@ export default function Payments() {
                     <div><label className="f">Type of payment</label>
                       <select value={draft.kind || ""} onChange={(e) => setDraft({ ...draft, kind: e.target.value })}>
                         <option value="">-</option>
-                        {meta.kinds.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {kinds.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     </div>
                     <div><label className="f">Payment method</label>
                       <select value={draft.method || ""} onChange={(e) => setDraft({ ...draft, method: e.target.value })}>
                         <option value="">-</option>
-                        {meta.methods.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {methods.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     </div>
                     <div><label className="f">Case type</label>
                       <select value={draft.case_type || ""} onChange={(e) => setDraft({ ...draft, case_type: e.target.value })}>
                         <option value="">-</option>
-                        {meta.types.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {types.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     </div>
                     <div><label className="f">Notes</label><input type="text" value={draft.notes || ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></div>

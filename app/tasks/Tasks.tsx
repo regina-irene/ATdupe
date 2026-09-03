@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_USERS, prioClass } from "../../lib/constants";
 import MultiSelect from "../MultiSelect";
-import Chip, { useChoices } from "../Chip";
+import Chip, { useChoices, useOptions } from "../Chip";
 import Linkify, { labelFor } from "../Linkify";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "../group";
 import { Resizer, useColWidths } from "../colwidths";
@@ -13,6 +13,7 @@ import { celebrate } from "../celebrate";
 import { seasonFor } from "../../lib/seasons";
 import Rules from "./Rules";
 import { CF } from "../../lib/constants";
+import SyncButton from "../SyncButton";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
 const todayStr = () => {
@@ -107,6 +108,12 @@ export default function Tasks() {
   const [draft, setDraft] = useState<any>({});
   const [syncing, setSyncing] = useState(false);
   const choices = useChoices();
+  // Airtable is the source of the option lists. What is already stored
+  // locally is only the fallback, so a status nobody has used yet still
+  // appears in the dropdowns.
+  const statuses = useOptions(CF.taskStatus, meta.statuses);
+  const priorities = useOptions(CF.taskPriority, meta.priorities);
+  const whos = useOptions(CF.taskWho, TASK_USERS);
   const [leaving, setLeaving] = useState<number | null>(null);
   const [cellEdit, setCellEdit] = useState<{ id: number; field: string } | null>(null);
   const [showRules, setShowRules] = useState(false);
@@ -362,7 +369,7 @@ export default function Tasks() {
             <select autoFocus defaultValue={t.priority || ""} onBlur={() => setCellEdit(null)}
               onChange={(e) => saveCell(t, "priority", e.target.value)}>
               <option value="">-</option>
-              {meta.priorities.map((x) => <option key={x} value={x}>{x}</option>)}
+              {priorities.map((x) => <option key={x} value={x}>{x}</option>)}
             </select>
           ) : <Chip v={t.priority} colors={choices[CF.taskPriority]} />}
         </td>;
@@ -385,7 +392,7 @@ export default function Tasks() {
             <select autoFocus defaultValue={t.status || ""} onBlur={() => setCellEdit(null)}
               onChange={(e) => saveCell(t, "status", e.target.value)}>
               <option value="">-</option>
-              {meta.statuses.map((x) => <option key={x} value={x}>{x}</option>)}
+              {statuses.map((x) => <option key={x} value={x}>{x}</option>)}
             </select>
           ) : <Chip v={t.status} colors={choices[CF.taskStatus]} />}
         </td>;
@@ -395,7 +402,7 @@ export default function Tasks() {
             <select autoFocus defaultValue={t.who || ""} onBlur={() => setCellEdit(null)}
               onChange={(e) => saveCell(t, "who", e.target.value)}>
               <option value="">-</option>
-              {TASK_USERS.map((u) => <option key={u} value={u}>{u}</option>)}
+              {whos.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
           ) : <Chip v={t.who} colors={choices[CF.taskWho]} dash={false} />}
         </td>;
@@ -455,7 +462,7 @@ export default function Tasks() {
         <div className="row">
           <div className="chips nowrap" style={{ marginTop: 0 }}>
             <button className={"chip " + (who === "" ? "on" : "")} onClick={() => { setWho(""); setPage(1); }}>Everyone</button>
-            {TASK_USERS.map((u) => (
+            {whos.map((u) => (
               <button key={u} className={"chip " + (who === u ? "on" : "")} onClick={() => { setWho(u); setPage(1); }}>{u}</button>
             ))}
           </div>
@@ -463,9 +470,9 @@ export default function Tasks() {
           <button className={"chip " + (showClosed ? "on" : "")} onClick={() => { setShowClosed(!showClosed); setPage(1); }}>{showClosed ? "Showing closed" : "Open only"}</button>
         </div>
         <div className="grid g4" style={{ marginTop: 9 }}>
-          <MultiSelect label="Status" allLabel="All statuses" options={meta.statuses}
+          <MultiSelect label="Status" allLabel="All statuses" options={statuses}
             value={status} onChange={(v) => { setStatus(v); setPage(1); }} />
-          <MultiSelect label="Priority" allLabel="All priorities" options={meta.priorities}
+          <MultiSelect label="Priority" allLabel="All priorities" options={priorities}
             value={priority} onChange={(v) => { setPriority(v); setPage(1); }} />
           <div><label className="f">Case contains</label><input type="search" value={caseQ} onChange={(e) => { setCaseQ(e.target.value); setPage(1); }} placeholder="e.g. Nichols" /></div>
           <div><label className="f">Task text contains</label><input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="e.g. discovery" /></div>
@@ -473,7 +480,7 @@ export default function Tasks() {
       </div>
 
       {showRules ? (
-        <Rules statuses={meta.statuses} priorities={meta.priorities} users={TASK_USERS} onChanged={load} />
+        <Rules statuses={statuses} priorities={priorities} users={whos} onChanged={load} />
       ) : null}
 
       <div className="card" data-tone="task">
@@ -514,7 +521,7 @@ export default function Tasks() {
             <ParadeControls />
             <button className="btn sm" onClick={() => { resetColumns(); cw.reset(); }}>Reset columns</button>
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
+            <SyncButton busy={syncing} onClick={syncNow} />
           </div>
         </div>
 
@@ -554,19 +561,19 @@ export default function Tasks() {
                     <div><label className="f">Status</label>
                       <select value={draft.status || ""} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
                         <option value="">-</option>
-                        {meta.statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+                        {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div><label className="f">Priority</label>
                       <select value={draft.priority || ""} onChange={(e) => setDraft({ ...draft, priority: e.target.value })}>
                         <option value="">-</option>
-                        {meta.priorities.map((s) => <option key={s} value={s}>{s}</option>)}
+                        {priorities.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div><label className="f">Who</label>
                       <select value={draft.who || ""} onChange={(e) => setDraft({ ...draft, who: e.target.value })}>
                         <option value="">-</option>
-                        {TASK_USERS.map((u) => <option key={u} value={u}>{u}</option>)}
+                        {whos.map((u) => <option key={u} value={u}>{u}</option>)}
                       </select>
                     </div>
                     <div><label className="f">Due</label><input type="date" value={draft.due_date || ""} onChange={(e) => setDraft({ ...draft, due_date: e.target.value })} /></div>

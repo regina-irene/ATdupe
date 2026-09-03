@@ -6,6 +6,7 @@ import Linkify, { labelFor } from "./Linkify";
 import { Resizer, useColWidths } from "./colwidths";
 import RowSize from "./RowSize";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
+import SyncButton from "./SyncButton";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
 type Cond = { fid: string; op: string; val: any };
@@ -594,7 +595,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
+            <SyncButton busy={syncing} onClick={syncNow} />
           </div>
         </div>
 

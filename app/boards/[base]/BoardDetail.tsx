@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import MirrorBoard from "../../MirrorBoard";
+import SyncButton from "../../SyncButton";
 
 type Tbl = { id: string; name: string; rows: number };
 type Board = { base_id: string; label: string; case_name: string | null; note: string | null; last_sync: string | null };
@@ -87,7 +88,7 @@ export default function BoardDetail({ base }: { base: string }) {
           </div>
           <div className="spacer" />
           <button className="btn sm" onClick={() => setLinking(!linking)}>{linking ? "Close" : "Link to a case"}</button>
-          <button className="btn sm" disabled={!!busy} onClick={syncAll}>{busy === "all" ? "Syncing all..." : "Sync every table"}</button>
+          <SyncButton busy={busy === "all"} onClick={syncAll} label="Sync every table" busyLabel="Syncing all..." />
         </div>
         {linking ? (
           <div className="row" style={{ marginTop: 9 }}>

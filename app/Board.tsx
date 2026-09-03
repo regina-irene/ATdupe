@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FIRMS, KINDS, QUICK_HOURS, CF } from "../lib/constants";
-import Chip, { useChoices } from "./Chip";
+import Chip, { useChoices, useOptions } from "./Chip";
 import { Resizer, useColWidths } from "./colwidths";
 import RowSize from "./RowSize";
 import Linkify, { labelFor } from "./Linkify";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
+import SyncButton from "./SyncButton";
 
 function today() {
   const d = new Date();
@@ -89,6 +90,11 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
   const choices = useChoices();
+  // Option lists come from Airtable itself, so a choice added there shows
+  // up here without a code change. The constants are only a fallback for
+  // when the token cannot read the base schema.
+  const kinds = useOptions(CF.timeKind, KINDS);
+  const firms = useOptions(CF.timeFirm, FIRMS);
   const cw = useColWidths("efl.time.widths");
   const loadViews = useCallback(() => {
     fetch("/api/views?page=time").then((r) => r.json())
@@ -387,8 +393,8 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
           <div><label className="f">Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
           <div><label className="f">Case</label><CaseCombo value={caseName} onChange={setCaseName} /></div>
           <div><label className="f">Hours</label><input type="number" step="0.01" min="0" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="0.25" /></div>
-          <div><label className="f">Type</label><select value={kind} onChange={(e) => setKind(e.target.value)}><option value="">-</option>{KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
-          <div><label className="f">Firm</label><select value={firm} onChange={(e) => setFirm(e.target.value)}>{FIRMS.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
+          <div><label className="f">Type</label><select value={kind} onChange={(e) => setKind(e.target.value)}><option value="">-</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
+          <div><label className="f">Firm</label><select value={firm} onChange={(e) => setFirm(e.target.value)}>{firms.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
         </div>
         <div className="chips nowrap">
           {QUICK_HOURS.map((h) => (<button type="button" key={h} className={"chip " + (String(h) === duration ? "on" : "")} onClick={() => setDuration(String(h))}>{h}</button>))}
@@ -440,8 +446,8 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
               <div><label className="f">From</label><input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset(""); setPage(1); }} /></div>
               <div><label className="f">To</label><input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset(""); setPage(1); }} /></div>
               <div><label className="f">Who</label><select value={fUser} onChange={(e) => { setFUser(e.target.value); setPage(1); }}><option value="">Everyone</option>{users.map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
-              <div><label className="f">Type</label><select value={fKind} onChange={(e) => { setFKind(e.target.value); setPage(1); }}><option value="">All types</option>{KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
-              <div><label className="f">Firm</label><select value={fFirm} onChange={(e) => { setFFirm(e.target.value); setPage(1); }}><option value="">All firms</option>{FIRMS.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
+              <div><label className="f">Type</label><select value={fKind} onChange={(e) => { setFKind(e.target.value); setPage(1); }}><option value="">All types</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
+              <div><label className="f">Firm</label><select value={fFirm} onChange={(e) => { setFFirm(e.target.value); setPage(1); }}><option value="">All firms</option>{firms.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
             </div>
             <div className="grid g2" style={{ marginTop: 9 }}>
               <div><label className="f">Case contains</label><input type="search" value={fCase} onChange={(e) => { setFCase(e.target.value); setPage(1); }} placeholder="e.g. Nichols" /></div>
@@ -531,7 +537,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
-            <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
+            <SyncButton busy={syncing} onClick={syncNow} />
           </div>
         </div>
         <div className="row noprint" style={{ marginBottom: 9 }}>
@@ -585,8 +591,8 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
                   </div>
                   <div style={{ marginTop: 7 }}><label className="f">Entry</label><textarea value={draft.time_entry || ""} onChange={(e) => setDraft({ ...draft, time_entry: e.target.value })} /></div>
                   <div className="grid g3" style={{ marginTop: 7 }}>
-                    <div><label className="f">Type</label><select value={draft.kind || ""} onChange={(e) => setDraft({ ...draft, kind: e.target.value })}><option value="">-</option>{KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
-                    <div><label className="f">Firm</label><select value={draft.firm || ""} onChange={(e) => setDraft({ ...draft, firm: e.target.value })}><option value="">-</option>{FIRMS.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
+                    <div><label className="f">Type</label><select value={draft.kind || ""} onChange={(e) => setDraft({ ...draft, kind: e.target.value })}><option value="">-</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
+                    <div><label className="f">Firm</label><select value={draft.firm || ""} onChange={(e) => setDraft({ ...draft, firm: e.target.value })}><option value="">-</option>{firms.map((f) => <option key={f} value={f}>{f}</option>)}</select></div>
                     <div><label className="f">Who</label><input type="text" value={draft.user_name || ""} onChange={(e) => setDraft({ ...draft, user_name: e.target.value })} /></div>
                   </div>
                   <div className="row" style={{ marginTop: 9 }}>

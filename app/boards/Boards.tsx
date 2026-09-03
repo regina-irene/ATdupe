@@ -2,6 +2,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Resizer, useColWidths } from "../colwidths";
 import RowSize from "../RowSize";
+import SyncButton from "../SyncButton";
 
 type Board = {
   id: number; base_id: string; label: string; case_name: string | null; note: string | null;
@@ -551,7 +552,7 @@ export default function Boards() {
               onClick={() => { const v = !fullText; setFullText(v); try { localStorage.setItem("efl.boards.fulltext", v ? "1" : "0"); } catch {} }}>
               {fullText ? "Condense updates" : "Full updates"}
             </button>
-            <button className="btn sm" disabled={!!busy} onClick={syncAll}>{busy === "all" ? "Syncing all..." : "Sync all boards"}</button>
+            <SyncButton busy={busy === "all"} onClick={syncAll} label="Sync all boards" busyLabel="Syncing all..." />
           </div>
         </div>
 
