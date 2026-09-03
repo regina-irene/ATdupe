@@ -66,7 +66,7 @@ const COLUMNS: { id: string; label: string; width?: number }[] = [
   { id: "closed", label: "Done", width: 54 },
   { id: "priority", label: "Priority", width: 128 },
   { id: "case", label: "Case", width: 180 },
-  { id: "task", label: "Task" },
+  { id: "task", label: "Task", width: 420 },
   { id: "status", label: "Status", width: 170 },
   { id: "who", label: "Who", width: 62 },
   { id: "due", label: "Due", width: 88 },
@@ -601,10 +601,10 @@ export default function Tasks() {
                     onClick={() => sortBy(c.id)}>
                   <span className="grip">⠿</span>{c.label}
                   <span className="caret">{sort === c.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
-                  <Resizer onDown={(e) => cw.start(e, c.id)} />
+                  <Resizer onDown={(e) => cw.start(e, c.id)} onReset={() => cw.clearOne(c.id)} />
                 </th>
               ))}
-              <th className="noprint" style={{ width: 62 }}></th>
+              <th className="noprint acts"></th>
             </tr></thead>
             <tbody>
               {loading ? (<tr><td colSpan={cols.length + 2} className="muted">Loading...</td></tr>)

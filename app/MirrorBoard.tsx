@@ -11,6 +11,21 @@ import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "./BulkB
 import SearchBar from "./SearchBar";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
+
+// A starting width per field type, so a board looks sensible before anyone
+// drags anything and so the actions column is the only one without a width.
+function defaultWidth(f: Field): number {
+  switch (f.type) {
+    case "checkbox": return 70;
+    case "number": case "currency": case "percent": case "rating": case "duration": return 110;
+    case "date": return 115;
+    case "dateTime": return 155;
+    case "singleSelect": return 160;
+    case "multipleSelects": return 190;
+    case "multilineText": case "richText": return 300;
+    default: return 200;
+  }
+}
 type Cond = { fid: string; op: string; val: any };
 type View = { id: number; name: string; owner?: string; params: any };
 type Row = { id: number; airtable_id: string | null; data: any; at_modified: string | null; updated_at: string; source: string };
@@ -644,7 +659,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
             <thead><tr>
               <SelectAllTh ids={rows.map((r) => r.id)} sel={pick.sel} setAll={pick.setAll} />
               {cols.map((f) => (
-                <th key={f.id} style={cw.widthOf(f.id)} className={"sortable" + (overId === f.id ? " over" : "") + (dragId === f.id ? " dragging" : "")}
+                <th key={f.id} style={cw.widthOf(f.id, defaultWidth(f))} className={"sortable" + (overId === f.id ? " over" : "") + (dragId === f.id ? " dragging" : "")}
                     draggable
                     onDragStart={() => { dragged.current = true; setDragId(f.id); }}
                     onDragEnd={() => { setDragId(null); setOverId(null); setTimeout(() => { dragged.current = false; }, 60); }}
@@ -654,11 +669,11 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
                     onClick={() => sortBy(f.id)}>
                   <span className="grip">⠿</span>{f.name}
                   <span className="caret">{sort === f.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
-                  <Resizer onDown={(e) => cw.start(e, f.id)} />
+                  <Resizer onDown={(e) => cw.start(e, f.id)} onReset={() => cw.clearOne(f.id)} />
                 </th>
               ))}
               {linksBoards ? <th className="noprint" style={{ width: 92 }}>Client board</th> : null}
-              <th className="noprint" style={{ width: 62 }}></th>
+              <th className="noprint acts"></th>
             </tr></thead>
             <tbody>
               {loading ? (<tr><td colSpan={span} className="muted">Loading...</td></tr>)

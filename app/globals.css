@@ -360,7 +360,7 @@ table.data tbody tr:has(.stale.bad) td:first-child{box-shadow:inset 3px 0 0 var(
 .resizer:hover::after{background:var(--accent)}
 body.resizing{cursor:col-resize;user-select:none}
 body.resizing .resizer::after{background:var(--accent)}
-table.data.sized{table-layout:fixed;width:100%}
+table.data.sized{table-layout:fixed;width:auto;min-width:100%}
 table.data.sized td{overflow-wrap:anywhere}
 table.data.sized th{overflow:hidden;text-overflow:ellipsis}
 :root[data-rows=s]{--rowlines:1;--rowpad:3px}
@@ -588,3 +588,14 @@ tr.picked>td{background:color-mix(in srgb,var(--accent) 11%,transparent)}
 .owedsplit .owed.total b{font-size:15px}
 tr.reprow td{border-top:1px dashed var(--line);color:var(--muted)}
 .partycol[data-party] .owedsplit{border-top-color:color-mix(in srgb,var(--pty) 26%,var(--line))}
+
+/* The trailing actions column has no width of its own, so it soaks up whatever
+   space the sized columns do not use. Without it a fixed-layout table hands the
+   slack back to the widest column, and dragging that column narrower does
+   nothing because it immediately grows again. */
+table.data th.acts{width:auto;min-width:62px}
+table.data.sized th.acts{width:auto}
+table.data td.noprint{white-space:nowrap}
+/* Only the last cell in a row is the actions cell; the tick column must stay
+   narrow rather than inherit the nowrap padding above. */
+table.data td.pickcell{width:34px}

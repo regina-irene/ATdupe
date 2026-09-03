@@ -31,7 +31,7 @@ const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
 const COLUMNS: { id: string; label: string; width?: number }[] = [
   { id: "date", label: "Date", width: 92 },
   { id: "case", label: "Case", width: 190 },
-  { id: "entry", label: "Entry" },
+  { id: "entry", label: "Entry", width: 380 },
   { id: "hrs", label: "Hrs", width: 58 },
   { id: "who", label: "Who", width: 112 },
   { id: "type", label: "Type", width: 128 },
@@ -273,7 +273,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
         onClick={() => { if (!dragged.current && canSort) toggleSort(id); }}>
         <span className="grip">⠿</span>{label}
         {sort === id ? <span className="ar">{dir === "asc" ? "▲" : "▼"}</span> : null}
-        <Resizer onDown={(e) => cw.start(e, id)} />
+        <Resizer onDown={(e) => cw.start(e, id)} onReset={() => cw.clearOne(id)} />
       </th>
     );
   }
@@ -635,7 +635,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
             <thead><tr>
               <SelectAllTh ids={rows.map((r: any) => r.id)} sel={pick.sel} setAll={pick.setAll} />
               {cols.map((c) => <Th key={c.id} id={c.id} label={c.label} w={c.width} />)}
-              <th className="noprint" style={{ width: 58 }}></th>
+              <th className="noprint acts"></th>
             </tr></thead>
             <tbody>
               {loading ? (<tr><td colSpan={cols.length + 2} className="muted">Loading...</td></tr>)

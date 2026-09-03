@@ -576,10 +576,10 @@ export default function Boards() {
                     onClick={() => sortBy(c.id)}>
                   <span className="grip">⠿</span>{c.label}
                   <span className="caret">{sort === c.id ? (dir === "asc" ? "▲" : "▼") : ""}</span>
-                  <Resizer onDown={(e) => cw.start(e, c.id)} />
+                  <Resizer onDown={(e) => cw.start(e, c.id)} onReset={() => cw.clearOne(c.id)} />
                 </th>
               ))}
-              <th className="noprint" style={{ width: 190 }}></th>
+              <th className="noprint acts"></th>
             </tr></thead>
             <tbody>
               {loading ? (<tr><td colSpan={span} className="muted">Loading...</td></tr>)
