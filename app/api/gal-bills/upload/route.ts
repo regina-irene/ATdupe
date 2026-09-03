@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         // read by a person before it moves anyone's balance.
         if (/payment/i.test(file.name) && !/billing/i.test(file.name)) {
           const fn: any = payFromName(file.name);
-          const found = payFromText(text)[0] || {};
+          const found: any = payFromText(text)[0] || {};
           payments.push({
             file: file.name,
             case_name: fn.caseName || null,
