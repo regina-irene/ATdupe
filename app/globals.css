@@ -17,6 +17,7 @@
 :root[data-page=boards]{--page:#4f46e5}
 :root[data-page=gal]{--page:#0369a1}
 :root[data-page=galpay]{--page:#065f46}
+:root[data-page=qn]{--page:#7c2d12}
 :root[data-page=setup]{--page:#0f766e}
 :root[data-mode=dark]{--bg:#0b1017;--panel:#141b25;--panel-2:#18202b;--ink:#e8eef7;--muted:#94a3b8;--line:#252f3d;--danger:#fb7185;--warn:#fbbf24;--good:#34d399;--sh:0 1px 2px rgba(0,0,0,.4);--sh-lg:0 10px 30px -10px rgba(0,0,0,.7)}
 :root[data-mode=dark][data-page=dashboard]{--page:#2dd4bf}
@@ -30,6 +31,7 @@
 :root[data-mode=dark][data-page=boards]{--page:#818cf8}
 :root[data-mode=dark][data-page=gal]{--page:#38bdf8}
 :root[data-mode=dark][data-page=galpay]{--page:#34d399}
+:root[data-mode=dark][data-page=qn]{--page:#fdba74}
 :root[data-mode=dark][data-page=setup]{--page:#2dd4bf}
 :root[data-density=compact]{--pad:9px;--gap:7px;--ctl:4px 8px}
 :root[data-density=roomy]{--pad:16px;--gap:13px;--ctl:8px 11px}
@@ -512,3 +514,18 @@ table.data tr.leaving td{animation:doneout .5s ease forwards}
 table.data td.edit{cursor:pointer;position:relative}
 table.data td.edit:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent);border-radius:4px}
 table.data td.edit select,table.data td.edit input,table.data td.edit textarea{width:100%;font-size:12.5px;padding:3px 5px}
+.card[data-tone=qn]{--tone:#7c2d12}
+:root[data-mode=dark] .card[data-tone=qn]{--tone:#fdba74}
+.qnpane{border:1px solid var(--line);border-radius:var(--rs);overflow:hidden;background:#fff}
+.qnpane iframe{display:block;width:100%;height:72vh;border:0;background:#fff}
+.qnpane.single iframe{height:76vh}
+.qncompare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qncompare .qnpane iframe{height:70vh}
+.qnpane[data-party=father]{border-color:color-mix(in srgb,#2563eb 40%,var(--line))}
+.qnpane[data-party=mother]{border-color:color-mix(in srgb,#db2777 40%,var(--line))}
+.qnpane[data-party=father] .partyhead{background:color-mix(in srgb,#2563eb 14%,var(--panel));color:#2563eb}
+.qnpane[data-party=mother] .partyhead{background:color-mix(in srgb,#db2777 14%,var(--panel));color:#db2777}
+.chip.pchip.father.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.chip.pchip.mother.on{background:#db2777;border-color:#db2777;color:#fff}
+@media (max-width:1000px){.qncompare{grid-template-columns:1fr}}
+@media print{.qnpane iframe{height:auto;min-height:80vh}.qncompare{grid-template-columns:1fr}}
