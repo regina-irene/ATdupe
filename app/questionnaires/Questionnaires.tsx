@@ -34,6 +34,8 @@ export default function Questionnaires() {
   const [resps, setResps] = useState<Resp[]>([]);
   const [tab, setTab] = useState<"answers" | "form">("answers");
   const [copied, setCopied] = useState("");
+  const [renaming, setRenaming] = useState<number | null>(null);
+  const [rdraft, setRdraft] = useState({ case_name: "", party: "" });
 
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -173,6 +175,23 @@ export default function Questionnaires() {
     load();
   }
 
+  // Moving a questionnaire to the right case, without uploading it again.
+  async function saveRename(r: Row) {
+    if (!rdraft.case_name.trim() || !rdraft.party.trim()) {
+      setMsg({ kind: "err", text: "A case and a party are both needed." });
+      return;
+    }
+    const j = await (await fetch("/api/questionnaires/" + r.id, {
+      method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ case_name: rdraft.case_name.trim(), party: rdraft.party.trim() }),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setRenaming(null);
+    setCaseName(rdraft.case_name.trim());
+    setMsg({ kind: "ok", text: "Moved to " + rdraft.case_name.trim() + "." });
+    load();
+  }
+
   async function remove(r: Row) {
     if (!confirm(`Remove the ${r.party} questionnaire for ${r.case_name}?`)) return;
     const j = await (await fetch("/api/questionnaires/" + r.id, { method: "DELETE" })).json();
@@ -283,7 +302,30 @@ export default function Questionnaires() {
                     <a className="btn ghost sm" href={link(p.share_token)} target="_blank" rel="noreferrer">Open</a>
                   </>
                 ) : <span className="muted small">Save it again to get a link.</span>}
+                <button className="btn ghost sm"
+                  onClick={() => { setRenaming(renaming === p.id ? null : p.id); setRdraft({ case_name: p.case_name, party: p.party }); }}>
+                  {renaming === p.id ? "Cancel" : "Move"}
+                </button>
                 <button className="btn ghost sm" onClick={() => remove(p)}>Remove</button>
+                {renaming === p.id ? (
+                  <div className="row" style={{ width: "100%", marginTop: 7 }}>
+                    <div><label className="f">Case</label>
+                      <input type="text" list="qncases2" value={rdraft.case_name} style={{ width: 240 }}
+                        onChange={(e) => setRdraft({ ...rdraft, case_name: e.target.value })} />
+                      <datalist id="qncases2">
+                        {[...new Set(rows.map((x) => x.case_name))].map((n) => <option key={n} value={n} />)}
+                      </datalist>
+                    </div>
+                    <div><label className="f">Party</label>
+                      <input type="text" list="qnparties2" value={rdraft.party} style={{ width: 140 }}
+                        onChange={(e) => setRdraft({ ...rdraft, party: e.target.value })} />
+                      <datalist id="qnparties2"><option value="Father" /><option value="Mother" /></datalist>
+                    </div>
+                    <div style={{ alignSelf: "flex-end" }}>
+                      <button className="btn primary sm" onClick={() => saveRename(p)}>Save</button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

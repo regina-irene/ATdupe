@@ -10,21 +10,37 @@ const PARTY = /\b(father|mother|dad|mom|petitioner|respondent|plaintiff|defendan
 
 const tidy = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
-// "Buchanan - Father Questionnaire.html", "Questionnaire - Mother (Buchanan).html"
+// Names come in two shapes:
+//   "Monfared v. Christian - Mother (Farzaneh Monfared).html"  brackets = person
+//   "Questionnaire - Mother (Buchanan).html"                   brackets = case
+// So the case is the part that is left once the party word and the wrapper
+// words are taken out, and the brackets are only used when nothing else is.
 function fromName(name: string) {
-  const base = name.replace(/\.html?$/i, "");
-  const party = base.match(PARTY);
+  const base = name.replace(/\.html?$/i, "").trim();
+  const partyM = base.match(PARTY);
+
   const paren = base.match(/\(([^)]{2,60})\)/);
-  let caseName = paren ? paren[1] : null;
-  if (!caseName) {
-    const bits = base.split(/\s*[-–]\s*/).map((x) => x.trim()).filter(Boolean);
-    const notParty = bits.filter((x) => !PARTY.test(x) && !/questionnaire/i.test(x));
-    if (notParty.length) caseName = notParty[0];
-  }
-  if (caseName) caseName = caseName.replace(/\s*(GAL|questionnaire)\s*$/i, "").trim();
+  const person = paren ? paren[1].trim() : null;
+  const withoutParen = base.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+
+  const NOISE = /^(gal\s*)?(intake\s*)?(form|questionnaire|questions|intake)$/i;
+  const segments = withoutParen.split(/\s*[-–—]\s*/).map((x) => x.trim()).filter(Boolean);
+
+  const candidates = segments.filter((seg) => {
+    const bare = seg.replace(PARTY, "").replace(/\b(gal|intake|form|questionnaire)\b/gi, "").trim();
+    if (!bare) return false;              // just the party, or just a wrapper word
+    return !NOISE.test(seg);
+  });
+
+  let caseName = candidates[0] || null;
+  // Nothing but the party and wrapper words: the brackets must be the case.
+  if (!caseName && person) caseName = person;
+  if (caseName) caseName = caseName.replace(/\s*(GAL|questionnaire|intake|form)\s*$/i, "").trim();
+
   return {
     caseName: caseName || null,
-    party: party ? tidy(party[1] === "dad" ? "father" : party[1] === "mom" ? "mother" : party[1]) : null,
+    party: partyM ? tidy(partyM[1] === "dad" ? "father" : partyM[1] === "mom" ? "mother" : partyM[1]) : null,
+    person,
   };
 }
 
@@ -55,7 +71,7 @@ export async function POST(req: Request) {
         const fn = fromName(file.name);
         out.case_name = (form.get("case_name") as string) || fn.caseName;
         out.party = (form.get("party") as string) || fn.party;
-        out.title = titleOf(html);
+        out.title = fn.person || titleOf(html);
         out.size = html.length;
         out.html = html;
         out.status = out.case_name && out.party ? "ready" : "needs-details";
