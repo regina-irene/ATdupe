@@ -572,3 +572,19 @@ tr.picked>td{background:color-mix(in srgb,var(--accent) 11%,transparent)}
 .searchbar input:focus{outline:none}
 .searchbar:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));
   box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+
+/* GAL payments: the two debts kept visually apart. Past due is work already
+   done and unpaid; replenishment is a deposit against work still to come. */
+.arrears{color:var(--danger)!important}
+.warm{color:var(--warn)!important}
+.owedsplit{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+  border-top:1px solid var(--line);margin-top:auto}
+.owedsplit .owed{display:flex;flex-direction:column;gap:2px;padding:7px 9px;background:var(--panel)}
+.owedsplit .owed span{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.owedsplit .owed b{font-size:14px;line-height:1.15}
+.owedsplit .owed.past{background:color-mix(in srgb,var(--danger) 7%,var(--panel))}
+.owedsplit .owed.rep{background:color-mix(in srgb,var(--warn) 8%,var(--panel))}
+.owedsplit .owed.total{grid-column:1 / -1;background:var(--panel-2)}
+.owedsplit .owed.total b{font-size:15px}
+tr.reprow td{border-top:1px dashed var(--line);color:var(--muted)}
+.partycol[data-party] .owedsplit{border-top-color:color-mix(in srgb,var(--pty) 26%,var(--line))}

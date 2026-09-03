@@ -239,7 +239,7 @@ export default function GalPayments() {
   }, [rows, q, latestOnly]);
 
   const totals = useMemo(() => {
-    let fees = 0, billed = 0, collected = 0, owing = 0;
+    let fees = 0, billed = 0, collected = 0, owing = 0, pastDue = 0, replenish = 0;
     const seen = new Set<string>();
     for (const r of rows) {
       const k = r.case_name.toLowerCase();
@@ -254,15 +254,23 @@ export default function GalPayments() {
         const sum = later.reduce((n, x) => n + Number(x.amount || 0), 0);
         // Where a bill states no amount due, fall back to a balance owed, and
         // where neither exists, leave this party out rather than count zero.
-        const due = p.totalDue != null ? Number(p.totalDue)
-          : p.balance != null && Number(p.balance) > 0 ? Number(p.balance) : null;
+        const bal = p.balance != null ? Number(p.balance) : null;
+        const pd = bal != null && bal > 0 ? bal : bal != null ? 0 : null;
+        const rep = p.totalDue != null ? Math.max(0, Number(p.totalDue) - (pd ?? 0)) : null;
+        const due = p.totalDue != null ? Number(p.totalDue) : pd != null && pd > 0 ? pd : null;
         collected += sum;
         if (due == null) continue;
         billed += due;
-        owing += Math.max(0, due - sum);
+        // Money paid since the bill clears the past due first, then the retainer.
+        const pdNow = Math.max(0, (pd ?? 0) - sum);
+        const spare = Math.max(0, sum - (pd ?? 0));
+        const repNow = rep != null ? Math.max(0, rep - spare) : 0;
+        pastDue += pdNow;
+        replenish += repNow;
+        owing += pdNow + repNow;
       }
     }
-    return { fees, billed, collected, owing, cases: seen.size };
+    return { fees, billed, collected, owing, pastDue, replenish, cases: seen.size };
   }, [rows, paid]);
 
   const partyNames = (b: Bill) => Object.keys(b.data?.parties || {});
@@ -285,11 +293,25 @@ export default function GalPayments() {
     const share = p.share != null ? Number(p.share)
       : fees != null && b.subtotal ? Math.round((fees / Number(b.subtotal)) * 1000) / 10 : null;
 
-    const replenish = p.totalDue != null && balance != null ? Number(p.totalDue) - balance : null;
-    const due = p.totalDue != null ? Number(p.totalDue) : balance != null && balance > 0 ? balance : null;
-    const nowOwing = due != null ? due - laterPaid : null;
+    // Two different things get asked for on a GAL bill and they are not the
+    // same debt. Past due is work already done and unpaid. Replenishment is a
+    // deposit against work not yet done. A party can be square on one and not
+    // the other, so they are kept apart all the way through.
+    const pastDue = balance != null && balance > 0 ? balance : balance != null ? 0 : null;
+    const replenish = p.totalDue != null ? Math.max(0, Number(p.totalDue) - (pastDue ?? 0)) : null;
 
-    return { paidOnBill, laterPaid, fees, balance, share, replenish, nowOwing, due };
+    // A payment since the bill clears the past due first, then goes to the
+    // retainer, which is the order the money is actually applied.
+    const pastDueNow = pastDue != null ? Math.max(0, pastDue - laterPaid) : null;
+    const spare = Math.max(0, laterPaid - (pastDue ?? 0));
+    const replenishNow = replenish != null ? Math.max(0, replenish - spare) : null;
+
+    const due = p.totalDue != null ? Number(p.totalDue) : pastDue != null && pastDue > 0 ? pastDue : null;
+    // Null only when the bill states neither figure, so unknown never reads as nil.
+    const nowOwing = pastDueNow == null && replenishNow == null
+      ? null : (pastDueNow ?? 0) + (replenishNow ?? 0);
+
+    return { paidOnBill, laterPaid, fees, balance, share, pastDue, replenish, pastDueNow, replenishNow, nowOwing, due };
   }
 
   return (
@@ -303,7 +325,8 @@ export default function GalPayments() {
             <div className="stat"><b>{money(totals.fees)}</b><span>Fees incurred</span></div>
             <div className="stat"><b>{money(totals.billed)}</b><span>Requested at billing</span></div>
             <div className="stat"><b>{money(totals.collected)}</b><span>Paid since</span></div>
-            <div className="stat"><b className={totals.owing > 0 ? "hot" : "paidoff"}>{money(totals.owing)}</b><span>Still owing</span></div>
+            <div className="stat"><b className={totals.pastDue > 0 ? "arrears" : "paidoff"}>{money(totals.pastDue)}</b><span>Past due</span></div>
+            <div className="stat"><b className={totals.replenish > 0 ? "warm" : "paidoff"}>{money(totals.replenish)}</b><span>Retainer to replenish</span></div>
           </div>
           <div className="spacer" />
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a case" style={{ width: 160 }} />
@@ -428,22 +451,28 @@ export default function GalPayments() {
                   const paidAll = parties.reduce((n, [name, p]) =>
                     n + p.payments.reduce((m, x) => m + Number(x.amount || 0), 0)
                       + since(b, name).reduce((m, x) => m + Number(x.amount || 0), 0), 0);
-                  let owingAll = 0;
+                  let pastAll = 0, repAll = 0;
                   let owingKnown = false;
                   for (const [name, p] of parties) {
                     const a = account(b, name, p);
                     if (a.nowOwing == null) continue;
                     owingKnown = true;
-                    owingAll += Math.max(0, a.nowOwing);
+                    pastAll += a.pastDueNow ?? 0;
+                    repAll += a.replenishNow ?? 0;
                   }
                   return (
                     <div className="stats casefigures">
                       <div className="stat"><b>{money(b.subtotal)}</b><span>Fees incurred</span></div>
                       <div className="stat"><b>{money(paidAll)}</b><span>Paid to date</span></div>
                       <div className="stat">
-                        <b className={!owingKnown ? "muted" : owingAll > 0.005 ? "hot" : "paidoff"}>
-                          {!owingKnown ? "not stated" : money(owingAll)}
-                        </b><span>Still owing</span>
+                        <b className={!owingKnown ? "muted" : pastAll > 0.005 ? "arrears" : "paidoff"}>
+                          {!owingKnown ? "not stated" : money(pastAll)}
+                        </b><span>Past due</span>
+                      </div>
+                      <div className="stat">
+                        <b className={!owingKnown ? "muted" : repAll > 0.005 ? "warm" : "paidoff"}>
+                          {!owingKnown ? "not stated" : money(repAll)}
+                        </b><span>Retainer to replenish</span>
                       </div>
                     </div>
                   );
@@ -591,8 +620,8 @@ export default function GalPayments() {
                             <td>{ac.balance == null ? "Paid to date" : ac.balance < 0 ? "Credit on file" : "Balance owed"}</td>
                             <td className="money">{ac.balance == null ? money(ac.paidOnBill) : money(Math.abs(ac.balance))}</td>
                           </tr>
-                          {ac.replenish != null && Math.abs(ac.replenish) > 0.005 ? (
-                            <tr><td>Retainer replenishment</td><td className="money">{money(ac.replenish)}</td></tr>
+                          {ac.replenish != null && ac.replenish > 0.005 ? (
+                            <tr className="reprow"><td>Retainer replenishment requested</td><td className="money">{money(ac.replenish)}</td></tr>
                           ) : null}
                         </tbody>
                       </table>
@@ -619,17 +648,36 @@ export default function GalPayments() {
                         {ac.laterPaid ? (
                           <>
                             <div><span>Paid since</span><b>{money(ac.laterPaid)}</b></div>
-                            <div className="due">
-                              <span>Now owing</span>
-                              {ac.nowOwing == null ? (
-                                <b className="muted" title="This bill does not state an amount due for this party">not stated</b>
-                              ) : ac.nowOwing <= 0.005 ? (
-                                <b className="paidoff">Paid in full</b>
-                              ) : <b>{money(ac.nowOwing)}</b>}
-                            </div>
                             <div><span>Last payment</span><b>{shortDate(since(b, name).map((x) => x.paid_on).sort().slice(-1)[0])}</b></div>
                           </>
                         ) : null}
+                      </div>
+
+                      {/* Two separate debts: work already done, and a deposit
+                          against work still to come. Kept apart so a party who
+                          is current on fees is not chased for arrears. */}
+                      <div className="owedsplit">
+                        <div className="owed past">
+                          <span>Past due{ac.laterPaid ? " now" : ""}</span>
+                          {ac.pastDueNow == null ? (
+                            <b className="muted" title="This bill states no balance for this party">not stated</b>
+                          ) : ac.pastDueNow <= 0.005 ? <b className="paidoff">Nothing past due</b>
+                            : <b className="arrears">{money(ac.pastDueNow)}</b>}
+                        </div>
+                        <div className="owed rep">
+                          <span>Retainer replenishment{ac.laterPaid ? " left" : ""}</span>
+                          {ac.replenishNow == null ? (
+                            <b className="muted" title="This bill does not ask this party to replenish">not stated</b>
+                          ) : ac.replenishNow <= 0.005 ? <b className="paidoff">None owed</b>
+                            : <b className="warm">{money(ac.replenishNow)}</b>}
+                        </div>
+                        <div className="owed total">
+                          <span>Total owed</span>
+                          {ac.nowOwing == null ? (
+                            <b className="muted">not stated</b>
+                          ) : ac.nowOwing <= 0.005 ? <b className="paidoff">Paid in full</b>
+                            : <b>{money(ac.nowOwing)}</b>}
+                        </div>
                       </div>
                     </div>
                   );
