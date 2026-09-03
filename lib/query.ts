@@ -11,6 +11,18 @@ export function orderBy(sp: URLSearchParams): string {
   return `order by ${col} ${dir} nulls last, id desc`;
 }
 
+// Free-text search across a whole row. Every whitespace-separated word has to
+// appear somewhere in the listed columns, so "smith depo" finds the Smith
+// deposition entry however the words are ordered.
+export function searchClause(term: string, cols: string[], from: number): { sql: string; params: any[] } {
+  const words = term.trim().split(/\s+/).filter(Boolean).slice(0, 8);
+  if (!words.length) return { sql: "", params: [] };
+  const blob = "concat_ws(' ', " + cols.join(", ") + ")";
+  const params: any[] = [];
+  const parts = words.map((w, i) => { params.push("%" + w + "%"); return blob + " ilike $" + (from + i); });
+  return { sql: "(" + parts.join(" and ") + ")", params };
+}
+
 export function buildWhere(sp: URLSearchParams) {
   const where: string[] = [];
   const params: any[] = [];
@@ -62,6 +74,14 @@ export function buildWhere(sp: URLSearchParams) {
     params.push("%" + qStr + "%");
     where.push("(time_entry ilike $" + a + " or content ilike $" + params.length + ")");
   }
+  // The one search box above the table looks at every column a person can see.
+  const term = sp.get("search");
+  if (term && term.trim()) {
+    const cols = ["time_entry", "content", "case_name", "user_name", "user_email", "kind", "firm", "url", "entry_date::text"];
+    const c = searchClause(term, cols, params.length + 1);
+    if (c.sql) { params.push(...c.params); where.push(c.sql); }
+  }
+
   const notQ = sp.get("notQ");
   if (notQ) add("coalesce(time_entry,'') not ilike ?", "%" + notQ + "%");
 

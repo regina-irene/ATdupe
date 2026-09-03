@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { q, ensureSchema } from "../../../lib/db";
 import { authorize } from "../../../lib/auth";
+import { searchClause } from "../../../lib/query";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,13 @@ export async function GET(req: Request) {
     if (sp.get("from")) add("pay_date >= ?::date", sp.get("from"));
     if (sp.get("to")) add("pay_date <= ?::date", sp.get("to"));
     many("year", "year", "int");
+
+    // The search box above the table.
+    const term = sp.get("search");
+    if (term && term.trim()) {
+      const c = searchClause(term, ["case_name", "notes", "kind", "method", "case_type", "cleared", "amount::text", "pay_date::text"], params.length + 1);
+      if (c.sql) { params.push(...c.params); where.push(c.sql); }
+    }
 
     const sql = where.length ? "where " + where.join(" and ") : "";
     const col = COL[sp.get("sort") || "date"] || COL.date;

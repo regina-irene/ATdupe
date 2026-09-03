@@ -2,6 +2,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Resizer, useColWidths } from "../colwidths";
 import RowSize from "../RowSize";
+import SearchBar from "../SearchBar";
 import SyncButton from "../SyncButton";
 
 type Board = {
@@ -296,9 +297,13 @@ export default function Boards() {
   const cols = shown.map((id) => COLUMNS.find((c) => c.id === id)!).filter(Boolean);
 
   const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    let list = t ? rows.filter((b) =>
-      [b.label, b.case_name, b.note, b.base_id, b.update_text].some((v) => String(v || "").toLowerCase().indexOf(t) >= 0)) : rows;
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let list = words.length
+      ? rows.filter((b) => {
+          const blob = [b.label, b.case_name, b.note, b.base_id, b.update_text].map((v) => String(v || "")).join(" ").toLowerCase();
+          return words.every((w) => blob.indexOf(w) >= 0);
+        })
+      : rows;
     for (const c of conds) {
       const def = FILTERS.find((f) => f.id === c.id);
       if (!def) continue;
@@ -520,7 +525,6 @@ export default function Boards() {
           </div>
           <div className="spacer" />
           <div className="row noprint">
-            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a board" style={{ width: 150 }} />
             <RowSize />
             <select value={group} onChange={(e) => setGroup(e.target.value)} style={{ width: 165 }}>
               {GROUPS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
@@ -555,6 +559,10 @@ export default function Boards() {
             <SyncButton busy={busy === "all"} onClick={syncAll} label="Sync all boards" busyLabel="Syncing all..." syncPrefix="b:" />
           </div>
         </div>
+
+        <SearchBar value={q} total={filtered.length}
+          placeholder="Search boards, cases, notes, latest updates..."
+          onChange={(v) => setQ(v)} />
 
         <div className="tablewrap">
           <table className={"data" + (cw.sized ? " sized" : "")}>

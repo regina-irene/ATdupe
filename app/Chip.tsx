@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type ChoiceColors = Record<string, Record<string, string>>;
 export type ChoiceMeta = {
@@ -11,18 +11,23 @@ export type ChoiceMeta = {
 const EMPTY: ChoiceMeta = { colors: {}, opts: {}, names: {} };
 
 // One request per browser session, shared by every chip and dropdown, so a
-// page with four boards on it does not fetch the schema four times.
+// page with four boards on it does not fetch the schema four times. Every
+// subscriber is told when it is refreshed, so new Airtable choices appear
+// without reloading the page.
 let cache: ChoiceMeta | null = null;
 let inflight: Promise<ChoiceMeta> | null = null;
+const watchers = new Set<(m: ChoiceMeta) => void>();
 
-function load(): Promise<ChoiceMeta> {
+function load(force = false): Promise<ChoiceMeta> {
+  if (force) { cache = null; inflight = null; }
   if (cache) return Promise.resolve(cache);
   if (!inflight) {
-    inflight = fetch("/api/choices")
+    inflight = fetch("/api/choices" + (force ? "?refresh=1" : ""))
       .then((r) => r.json())
       .then((j) => {
         cache = { colors: j?.colors || {}, opts: j?.opts || {}, names: j?.names || {} };
-        return cache;
+        watchers.forEach((w) => w(cache!));
+        return cache!;
       })
       .catch(() => EMPTY)
       .finally(() => { inflight = null; });
@@ -30,9 +35,17 @@ function load(): Promise<ChoiceMeta> {
   return inflight;
 }
 
+// Called after a sync finishes, so a select choice renamed or added in
+// Airtable shows up straight away.
+export function refreshChoices() { load(true); }
+
 export function useChoiceMeta(): ChoiceMeta {
   const [meta, setMeta] = useState<ChoiceMeta>(cache || EMPTY);
-  useEffect(() => { let live = true; load().then((m) => { if (live) setMeta(m); }); return () => { live = false; }; }, []);
+  useEffect(() => {
+    watchers.add(setMeta);
+    load().then((m) => setMeta(m));
+    return () => { watchers.delete(setMeta); };
+  }, []);
   return meta;
 }
 

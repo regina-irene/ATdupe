@@ -38,7 +38,13 @@ export async function setState(key: string, value: string | null) {
 // When each board last finished a sync, so every Sync Airtable button can say
 // so. One row per board key in sync_state.
 export async function stampSync(key: string) {
-  try { await setState("last_sync_" + key, new Date().toISOString()); } catch {}
+  try {
+    await setState("last_sync_" + key, new Date().toISOString());
+    // A sync is also the moment to expire the cached Airtable schema, so a
+    // select choice added or renamed there is picked up on the next read
+    // rather than up to five minutes later.
+    await setState("choice_colors_at", "0");
+  } catch {}
 }
 
 export async function lastSyncs(): Promise<Record<string, string>> {

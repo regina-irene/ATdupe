@@ -21,8 +21,14 @@ export async function GET(req: Request, ctx: any) {
     const params: any[] = [p.key];
     const add = (clause: string, v: any) => { params.push(v); where.push(clause.replace("?", "$" + params.length)); };
 
-    // Free text across every field.
-    if (sp.get("q")) add("data::text ilike ?", "%" + sp.get("q") + "%");
+    // Free text across every field. Each word has to appear, so two words
+    // narrow the result rather than widening it.
+    for (const term of [sp.get("q"), sp.get("search")]) {
+      if (!term || !term.trim()) continue;
+      for (const w of term.trim().split(/\s+/).filter(Boolean).slice(0, 8)) {
+        add("data::text ilike ?", "%" + w + "%");
+      }
+    }
 
     // Conditions arrive as repeatable f=<fieldId>:<op>:<value>.
     // ops: eq (repeat for several values), has, bool, gte, lte, empty, notempty

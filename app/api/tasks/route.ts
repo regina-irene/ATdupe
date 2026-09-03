@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { q, ensureSchema } from "../../../lib/db";
 import { authorize } from "../../../lib/auth";
+import { searchClause } from "../../../lib/query";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,14 @@ export async function GET(req: Request) {
       where.push(`(case_name ilike $${i} or client_name ilike $${i})`);
     }
     if (sp.get("q")) add("task ilike ?", "%" + sp.get("q") + "%");
+
+    // The search box above the table, across every visible column plus the
+    // extra Airtable fields kept in data.
+    const term = sp.get("search");
+    if (term && term.trim()) {
+      const c = searchClause(term, ["task", "case_name", "client_name", "status", "priority", "who", "link", "due_date::text", "data::text"], params.length + 1);
+      if (c.sql) { params.push(...c.params); where.push(c.sql); }
+    }
 
     const sql = where.length ? "where " + where.join(" and ") : "";
     const col = COL[sp.get("sort") || "order"] || COL.order;

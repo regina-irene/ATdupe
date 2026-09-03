@@ -9,6 +9,7 @@ import Linkify, { labelFor } from "./Linkify";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 import SyncButton from "./SyncButton";
 import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "./BulkBar";
+import SearchBar from "./SearchBar";
 
 function today() {
   const d = new Date();
@@ -180,6 +181,9 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   const [fKind, setFKind] = useState("");
   const [fFirm, setFFirm] = useState("");
   const [search, setSearch] = useState("");
+  // The search box above the table, separate from the "Entry text contains"
+  // filter, and searching every column rather than just the entry text.
+  const [qAll, setQAll] = useState("");
   const [within, setWithin] = useState("");
   const [billed, setBilled] = useState("");
   const [minHrs, setMinHrs] = useState("");
@@ -212,6 +216,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
     if (fKind) p.set("kind", fKind);
     if (fFirm) p.set("firm", fFirm);
     if (search) p.set("q", search);
+    if (qAll.trim()) p.set("search", qAll.trim());
     if (notQ) p.set("notQ", notQ);
     if (within) { if (/^\d+$/.test(within)) p.set("lastDays", within); else p.set("within", within); }
     if (billed) p.set("billed", billed);
@@ -222,7 +227,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
     if (hasUrl) p.set("hasUrl", hasUrl);
     p.set("sort", sort); p.set("dir", dir);
     return p.toString();
-  }, [from, to, fUser, fCase, fKind, fFirm, search, sort, dir, within, billed, minHrs, maxHrs, notQ, noHrs, caseEmpty, hasUrl]);
+  }, [from, to, fUser, fCase, fKind, fFirm, search, qAll, sort, dir, within, billed, minHrs, maxHrs, notQ, noHrs, caseEmpty, hasUrl]);
 
   const query = useMemo(() => filterQS + "&page=" + page + "&pageSize=" + pageSize, [filterQS, page, pageSize]);
   const extraCount = [fUser, fCase, fKind, fFirm, search, within, billed, minHrs, maxHrs, notQ, hasUrl].filter(Boolean).length + (noHrs ? 1 : 0) + (caseEmpty ? 1 : 0);
@@ -394,11 +399,11 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
 
   const cols = order.map((id) => COLUMNS.find((c) => c.id === id)!).filter(Boolean);
 
-  const current = { from, to, fUser, fCase, fKind, fFirm, search, sort, dir, within, billed, minHrs, maxHrs, notQ, noHrs, caseEmpty, hasUrl };
-  const isBlank = !from && !to && !fUser && !fCase && !fKind && !fFirm && !search && !within && !billed && !minHrs && !maxHrs && !notQ && !noHrs && !caseEmpty && !hasUrl;
+  const current = { from, to, fUser, fCase, fKind, fFirm, search, qAll, sort, dir, within, billed, minHrs, maxHrs, notQ, noHrs, caseEmpty, hasUrl };
+  const isBlank = !from && !to && !fUser && !fCase && !fKind && !fFirm && !search && !qAll && !within && !billed && !minHrs && !maxHrs && !notQ && !noHrs && !caseEmpty && !hasUrl;
   const sameAs = (p: any) => JSON.stringify({
     from: p?.from ?? "", to: p?.to ?? "", fUser: p?.fUser ?? "", fCase: p?.fCase ?? "",
-    fKind: p?.fKind ?? "", fFirm: p?.fFirm ?? "", search: p?.search ?? "",
+    fKind: p?.fKind ?? "", fFirm: p?.fFirm ?? "", search: p?.search ?? "", qAll: p?.qAll ?? "",
     sort: p?.sort ?? "date", dir: p?.dir ?? "desc",
     within: p?.within ?? "", billed: p?.billed ?? "", minHrs: p?.minHrs ?? "", maxHrs: p?.maxHrs ?? "",
     notQ: p?.notQ ?? "", noHrs: p?.noHrs ?? false, caseEmpty: p?.caseEmpty ?? false, hasUrl: p?.hasUrl ?? "",
@@ -408,7 +413,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
     setFrom(p?.from ?? ""); setTo(p?.to ?? "");
     setFUser(p?.fUser ?? ""); setFCase(p?.fCase ?? "");
     setFKind(p?.fKind ?? ""); setFFirm(p?.fFirm ?? "");
-    setSearch(p?.search ?? "");
+    setSearch(p?.search ?? ""); setQAll(p?.qAll ?? "");
     setSort(p?.sort ?? "date"); setDir(p?.dir ?? "desc");
     setWithin(p?.within ?? ""); setBilled(p?.billed ?? "");
     setMinHrs(p?.minHrs ?? ""); setMaxHrs(p?.maxHrs ?? ""); setNotQ(p?.notQ ?? "");
@@ -617,6 +622,10 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
             <button className="btn sm" onClick={() => setNaming(true)}>Save these filters</button>
           )}
         </div>
+
+        <SearchBar value={qAll} total={total}
+          placeholder="Search entries, cases, who, type, firm, links..."
+          onChange={(v) => { setQAll(v); setPage(1); }} />
 
         <BulkBar count={pick.count} fields={BULK_FIELDS} busy={bulking} noun="entries"
           onApply={bulkApply} onClear={pick.clear} onDelete={bulkDelete} />

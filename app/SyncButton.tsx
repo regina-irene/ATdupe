@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { refreshChoices } from "./Chip";
 
 // Airtable's mark: three coloured bars plus the blue slab. Drawn inline so it
 // needs no network request and picks up the button's size.
@@ -84,9 +85,10 @@ export default function SyncButton({
 }) {
   const { at, refresh } = useLastSync(syncKey, syncPrefix);
   const was = useRef(!!busy);
-  // Re-read the stamp the moment a sync finishes.
+  // Re-read the stamp the moment a sync finishes, and the Airtable select
+  // choices with it, so a type added or renamed there shows up straight away.
   useEffect(() => {
-    if (was.current && !busy) refresh();
+    if (was.current && !busy) { refresh(); refreshChoices(); }
     was.current = !!busy;
   }, [busy, refresh]);
 

@@ -15,6 +15,7 @@ import Rules from "./Rules";
 import { CF } from "../../lib/constants";
 import SyncButton from "../SyncButton";
 import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "../BulkBar";
+import SearchBar from "../SearchBar";
 
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
 const todayStr = () => {
@@ -45,7 +46,7 @@ type View = { id: number; name: string; owner?: string; params: any };
 const asList = (v: any): string[] =>
   Array.isArray(v) ? [...v].sort() : v ? [String(v)] : [];
 
-const BLANK = { who: "", status: [] as string[], priority: [] as string[], caseQ: "", q: "", showClosed: false, sort: "order", dir: "asc" };
+const BLANK = { who: "", status: [] as string[], priority: [] as string[], caseQ: "", q: "", qAll: "", showClosed: false, sort: "order", dir: "asc" };
 
 const DEFAULT_DIR: Record<string, string> = {
   order: "asc", priority: "asc", case: "asc", task: "asc",
@@ -87,6 +88,7 @@ export default function Tasks() {
   const [priority, setPriority] = useState<string[]>([]);
   const [caseQ, setCaseQ] = useState("");
   const [q, setQ] = useState("");
+  const [qAll, setQAll] = useState("");
   const [showClosed, setShowClosed] = useState(false);
   const [sort, setSort] = useState("order");
   const [dir, setDir] = useState("asc");
@@ -198,8 +200,8 @@ export default function Tasks() {
     persist(next);
   }
 
-  const current = useMemo(() => ({ who, status, priority, caseQ, q, showClosed, sort, dir }),
-    [who, status, priority, caseQ, q, showClosed, sort, dir]);
+  const current = useMemo(() => ({ who, status, priority, caseQ, q, qAll, showClosed, sort, dir }),
+    [who, status, priority, caseQ, q, qAll, showClosed, sort, dir]);
   const isBlank = useMemo(() => JSON.stringify(current) === JSON.stringify(BLANK), [current]);
 
   useEffect(() => {
@@ -216,13 +218,14 @@ export default function Tasks() {
     priority.forEach((v) => p.append("priority", v));
     if (caseQ) p.set("case", caseQ);
     if (q) p.set("q", q);
+    if (qAll.trim()) p.set("search", qAll.trim());
     if (showClosed) p.set("closed", "1");
     p.set("sort", sort);
     p.set("dir", dir);
     p.set("page", String(page));
     p.set("pageSize", String(pageSize));
     return p.toString();
-  }, [who, status, priority, caseQ, q, showClosed, sort, dir, page]);
+  }, [who, status, priority, caseQ, q, qAll, showClosed, sort, dir, page, pageSize]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -275,6 +278,7 @@ export default function Tasks() {
     setPriority(asList(p.priority));
     setCaseQ(p.caseQ || "");
     setQ(p.q || "");
+    setQAll(p.qAll || "");
     setShowClosed(!!p.showClosed);
     setSort(p.sort || "order");
     setDir(p.dir || "asc");
@@ -572,6 +576,10 @@ export default function Tasks() {
             <SyncButton busy={syncing} onClick={syncNow} syncKey="tasks" />
           </div>
         </div>
+
+        <SearchBar value={qAll} total={total}
+          placeholder="Search tasks, cases, clients, status, who..."
+          onChange={(v) => { setQAll(v); setPage(1); }} />
 
         <BulkBar count={pick.count} fields={BULK_FIELDS} busy={bulking} noun="tasks"
           onApply={bulkApply} onClear={pick.clear} onDelete={bulkDelete} />

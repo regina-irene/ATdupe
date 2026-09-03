@@ -563,3 +563,12 @@ tr.picked>td{background:color-mix(in srgb,var(--accent) 11%,transparent)}
 /* Last-sync stamp, sitting under or beside the Sync Airtable button. */
 .syncwrap{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px}
 .syncwrap .stamp{font-size:10.5px;color:var(--muted);white-space:nowrap;padding-left:2px}
+
+/* The search box above each table. */
+.searchbar{display:flex;align-items:center;gap:8px;margin-bottom:9px;padding:6px 10px;
+  border:1px solid var(--line);border-radius:var(--rs);background:var(--panel-2)}
+.searchbar .mag{font-size:19px;line-height:1;color:var(--muted);margin-top:-2px}
+.searchbar input{flex:1;margin:0;border:0;background:transparent;font-size:14px;padding:4px 0;min-width:0}
+.searchbar input:focus{outline:none}
+.searchbar:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}

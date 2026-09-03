@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const KEY = "choice_meta";
 const AT_KEY = "choice_colors_at";
-const MAX_AGE = 15 * 60 * 1000;
+const MAX_AGE = 5 * 60 * 1000;
 
 type Meta = {
   // fieldId -> choice name -> Airtable colour token

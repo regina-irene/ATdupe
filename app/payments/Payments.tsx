@@ -8,6 +8,7 @@ import RowSize from "../RowSize";
 import { CF } from "../../lib/constants";
 import SyncButton from "../SyncButton";
 import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "../BulkBar";
+import SearchBar from "../SearchBar";
 
 const money = (v: any) =>
   v === null || v === undefined || v === "" ? "" :
@@ -64,6 +65,7 @@ export default function Payments() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
+  const [qAll, setQAll] = useState("");
   const [sort, setSort] = useState("date");
   const [dir, setDir] = useState("desc");
   const [page, setPage] = useState(1);
@@ -161,10 +163,11 @@ export default function Payments() {
     if (from) p.set("from", from);
     if (to) p.set("to", to);
     if (q) p.set("q", q);
+    if (qAll.trim()) p.set("search", qAll.trim());
     p.set("sort", sort); p.set("dir", dir);
     p.set("page", String(page)); p.set("pageSize", String(pageSize));
     return p.toString();
-  }, [caseQ, kind, method, type, cleared, year, from, to, q, sort, dir, page]);
+  }, [caseQ, kind, method, type, cleared, year, from, to, q, qAll, sort, dir, page, pageSize]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -196,7 +199,7 @@ export default function Payments() {
   }
   function clearFilters() {
     setCaseQ(""); setKind([]); setMethod([]); setType([]); setCleared([]);
-    setYear([]); setFrom(""); setTo(""); setQ(""); setPage(1);
+    setYear([]); setFrom(""); setTo(""); setQ(""); setQAll(""); setPage(1);
   }
 
   async function addPayment() {
@@ -383,6 +386,10 @@ export default function Payments() {
             <SyncButton busy={syncing} onClick={syncNow} syncKey="payments" />
           </div>
         </div>
+
+        <SearchBar value={qAll} total={tot.total}
+          placeholder="Search cases, notes, method, type, amounts..."
+          onChange={(v) => { setQAll(v); setPage(1); }} />
 
         <BulkBar count={rowsel.count} fields={BULK_FIELDS} busy={bulking} noun="payments"
           onApply={bulkApply} onClear={rowsel.clear} />

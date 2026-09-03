@@ -8,6 +8,7 @@ import RowSize from "./RowSize";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 import SyncButton from "./SyncButton";
 import BulkBar, { BulkField, SelectAllTh, SelectTd, useSelection } from "./BulkBar";
+import SearchBar from "./SearchBar";
 
 type Field = { id: string; name: string; type: string; writable: boolean; choices?: { name: string; color: string }[] };
 type Cond = { fid: string; op: string; val: any };
@@ -166,7 +167,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
     p.set("page", String(page));
     p.set("pageSize", String(pageSize));
     return p.toString();
-  }, [q, conds, sort, dir, page]);
+  }, [q, conds, sort, dir, page, pageSize]);
 
   const viewPage = "mirror:" + boardKey;
   const loadViews = useCallback(() => {
@@ -529,8 +530,7 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
           </>
         ) : null}
         <div className="row" style={{ marginTop: 9 }}>
-          <div style={{ flex: 1 }}><label className="f">Search everything</label>
-            <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, note, anything" /></div>
+          <div className="spacer" />
           {clientUpdateField ? (
             <div className="chips" style={{ marginTop: 0, alignSelf: "flex-end", paddingBottom: 2 }}>
               <button className={"chip " + (conds.some((c) => c.fid === clientUpdateField.id && c.op === "stale") ? "on" : "")}
@@ -631,6 +631,10 @@ export default function MirrorBoard({ boardKey }: { boardKey: string }) {
             <SyncButton busy={syncing} onClick={syncNow} syncKey={boardKey} />
           </div>
         </div>
+
+        <SearchBar value={q} total={total}
+          placeholder={"Search every field on this board..."}
+          onChange={(v) => { setQ(v); setPage(1); }} />
 
         <BulkBar count={pick.count} fields={BULK_FIELDS} busy={bulking} noun="records"
           onApply={bulkApply} onClear={pick.clear} />
