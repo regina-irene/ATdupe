@@ -155,6 +155,24 @@ export default function Questionnaires() {
     setResps((cur) => cur.map((r) => (ids.indexOf(r.id) >= 0 ? { ...r, seen: true } : r)));
   }
 
+  async function dropResponse(r: Resp) {
+    if (!confirm(`Delete ${r.party}'s submission for ${r.case_name}? This cannot be undone.`)) return;
+    const j = await (await fetch("/api/questionnaires/responses/" + r.id, { method: "DELETE" })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setMsg({ kind: "ok", text: "Submission deleted." });
+    load();
+  }
+
+  async function clearCase() {
+    if (!caseResps.length) return;
+    if (!confirm(`Delete all ${caseResps.length} submission(s) for ${caseName}, and any part-finished answers? This cannot be undone.`)) return;
+    const j = await (await fetch(
+      "/api/questionnaires/responses?drafts=1&case=" + encodeURIComponent(caseName), { method: "DELETE" })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setMsg({ kind: "ok", text: `Cleared ${j.removed} submission(s) for ${caseName}.` });
+    load();
+  }
+
   async function remove(r: Row) {
     if (!confirm(`Remove the ${r.party} questionnaire for ${r.case_name}?`)) return;
     const j = await (await fetch("/api/questionnaires/" + r.id, { method: "DELETE" })).json();
@@ -290,6 +308,9 @@ export default function Questionnaires() {
               </div>
             ) : null}
             <div className="spacer" />
+            {tab === "answers" && caseResps.length ? (
+              <button className="btn ghost sm noprint" onClick={clearCase}>Clear all answers</button>
+            ) : null}
             {tab === "form" && current && !compare ? (
               <button className="btn sm noprint" onClick={() => openInTab(html, current.party)}>Open in a tab</button>
             ) : null}
@@ -318,10 +339,16 @@ export default function Questionnaires() {
                         </div>
                         <pre>{latest.responses}</pre>
                         <div className="row noprint" style={{ marginTop: 8 }}>
+                          <a className="btn sm" href={"/api/questionnaires/export?format=doc&id=" + latest.id}>
+                            Word
+                          </a>
+                          <a className="btn sm" href={"/api/questionnaires/export?format=print&id=" + latest.id}
+                            target="_blank" rel="noreferrer">PDF</a>
                           <button className="btn ghost sm"
                             onClick={() => copy(latest.responses || "", "ans" + latest.id)}>
                             {copied === "ans" + latest.id ? "Copied" : "Copy answers"}
                           </button>
+                          <button className="btn ghost sm" onClick={() => dropResponse(latest)}>Delete</button>
                           {caseResps.filter((r) => r.party === pt).length > 1 ? (
                             <span className="muted small">
                               {caseResps.filter((r) => r.party === pt).length} submissions, showing the most recent

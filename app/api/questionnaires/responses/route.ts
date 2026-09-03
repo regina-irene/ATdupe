@@ -22,6 +22,31 @@ export async function POST(req: Request) {
   }
 }
 
+// Clearing a case wipes its submissions and any part-finished drafts, so a
+// test run leaves nothing behind.
+export async function DELETE(req: Request) {
+  if (!(await authorize(req))) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  try {
+    await ensureSchema();
+    const sp = new URL(req.url).searchParams;
+    const caseName = sp.get("case");
+    if (!caseName) return NextResponse.json({ error: "Which case?" }, { status: 400 });
+
+    const gone = await q(
+      "delete from questionnaire_responses where lower(case_name) = lower($1) returning id", [caseName]);
+
+    if (sp.get("drafts") === "1") {
+      await q(
+        `delete from questionnaire_drafts where token in
+           (select share_token from questionnaires where lower(case_name) = lower($1) and share_token is not null)`,
+        [caseName]);
+    }
+    return NextResponse.json({ ok: true, removed: gone.length });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
 export async function GET(req: Request) {
   if (!(await authorize(req))) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   try {
