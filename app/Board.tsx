@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FIRMS, KINDS, QUICK_HOURS, CF } from "../lib/constants";
 import Chip, { useChoices } from "./Chip";
 import { Resizer, useColWidths } from "./colwidths";
 import RowSize from "./RowSize";
+import Linkify, { labelFor } from "./Linkify";
 import { Fragment, GroupDef, GroupPicker, GroupRow, buildGroups } from "./group";
 
 function today() {
@@ -23,6 +24,26 @@ function startOfWeek(iso: string) {
 }
 const startOfMonth = (iso: string) => iso.slice(0, 8) + "01";
 const d10 = (v: any) => (v ? String(v).slice(0, 10) : "");
+
+const COLUMNS: { id: string; label: string; width?: number }[] = [
+  { id: "date", label: "Date", width: 92 },
+  { id: "case", label: "Case", width: 190 },
+  { id: "entry", label: "Entry" },
+  { id: "hrs", label: "Hrs", width: 58 },
+  { id: "who", label: "Who", width: 112 },
+  { id: "type", label: "Type", width: 128 },
+  { id: "firm", label: "Firm", width: 100 },
+  { id: "billed", label: "Billed", width: 74 },
+  { id: "url", label: "Link", width: 110 },
+  { id: "content", label: "Content", width: 200 },
+  { id: "email", label: "Email", width: 170 },
+  { id: "source", label: "Source", width: 90 },
+  { id: "added", label: "Added", width: 130 },
+  { id: "changed", label: "Changed", width: 130 },
+];
+const DEFAULT_COLS = ["date", "case", "entry", "hrs", "who", "type"];
+const SORTABLE = new Set(["date", "case", "entry", "hrs", "who", "type", "firm", "billed", "url", "content", "email", "added", "changed"]);
+const COLS_KEY = "efl.time.columns";
 
 function CaseCombo({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -69,6 +90,19 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
   const choices = useChoices();
   const cw = useColWidths("efl.time.widths");
+  const loadViews = useCallback(() => {
+    fetch("/api/views?page=time").then((r) => r.json())
+      .then((j) => { if (!j.error) setViews(j.rows || []); }).catch(() => {});
+  }, []);
+  useEffect(() => { loadViews(); }, [loadViews]);
+  const [order, setOrder] = useState<string[]>(DEFAULT_COLS);
+  const [picker, setPicker] = useState(false);
+  const pickerBox = useRef<HTMLDivElement>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragged = useRef(false);
+  const [views, setViews] = useState<any[]>([]);
+  const [naming, setNaming] = useState(false);
+  const [viewName, setViewName] = useState("");
   const [groupId, setGroupId] = useState("");
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const [polishing, setPolishing] = useState(false);
@@ -89,6 +123,14 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   const [fKind, setFKind] = useState("");
   const [fFirm, setFFirm] = useState("");
   const [search, setSearch] = useState("");
+  const [within, setWithin] = useState("");
+  const [billed, setBilled] = useState("");
+  const [minHrs, setMinHrs] = useState("");
+  const [maxHrs, setMaxHrs] = useState("");
+  const [notQ, setNotQ] = useState("");
+  const [noHrs, setNoHrs] = useState(false);
+  const [caseEmpty, setCaseEmpty] = useState(false);
+  const [hasUrl, setHasUrl] = useState("");
   const [preset, setPreset] = useState("month");
   const [showFilters, setShowFilters] = useState(false);
   const [sort, setSort] = useState("date");
@@ -113,12 +155,20 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
     if (fKind) p.set("kind", fKind);
     if (fFirm) p.set("firm", fFirm);
     if (search) p.set("q", search);
+    if (notQ) p.set("notQ", notQ);
+    if (within) { if (/^\d+$/.test(within)) p.set("lastDays", within); else p.set("within", within); }
+    if (billed) p.set("billed", billed);
+    if (minHrs) p.set("minHrs", minHrs);
+    if (maxHrs) p.set("maxHrs", maxHrs);
+    if (noHrs) p.set("noHrs", "1");
+    if (caseEmpty) p.set("caseEmpty", "1");
+    if (hasUrl) p.set("hasUrl", hasUrl);
     p.set("sort", sort); p.set("dir", dir);
     return p.toString();
-  }, [from, to, fUser, fCase, fKind, fFirm, search, sort, dir]);
+  }, [from, to, fUser, fCase, fKind, fFirm, search, sort, dir, within, billed, minHrs, maxHrs, notQ, noHrs, caseEmpty, hasUrl]);
 
   const query = useMemo(() => filterQS + "&page=" + page + "&pageSize=" + pageSize, [filterQS, page, pageSize]);
-  const extraCount = [fUser, fCase, fKind, fFirm, search].filter(Boolean).length;
+  const extraCount = [fUser, fCase, fKind, fFirm, search, within, billed, minHrs, maxHrs, notQ, hasUrl].filter(Boolean).length + (noHrs ? 1 : 0) + (caseEmpty ? 1 : 0);
 
   async function load() {
     setLoading(true);
@@ -151,12 +201,42 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   }
 
   function Th({ id, label, w }: { id: string; label: string; w?: number }) {
+    const canSort = SORTABLE.has(id);
     return (
-      <th className="sortable" style={cw.widthOf(id, w)} onClick={() => toggleSort(id)}>
-        {label}{sort === id ? <span className="ar">{dir === "asc" ? "▲" : "▼"}</span> : null}
+      <th className={canSort ? "sortable" : ""} style={cw.widthOf(id, w)} draggable
+        onDragStart={() => { dragged.current = true; setDragId(id); }}
+        onDragEnd={() => { setDragId(null); setTimeout(() => { dragged.current = false; }, 60); }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); dropCol(id); }}
+        onClick={() => { if (!dragged.current && canSort) toggleSort(id); }}>
+        <span className="grip">⠿</span>{label}
+        {sort === id ? <span className="ar">{dir === "asc" ? "▲" : "▼"}</span> : null}
         <Resizer onDown={(e) => cw.start(e, id)} />
       </th>
     );
+  }
+
+  // One cell renderer per column, so the picker can show any of them.
+  function cell(id: string, r: any) {
+    switch (id) {
+      case "date": return <td key={id} className="date">{d10(r.entry_date)}</td>;
+      case "case": return <td key={id}>{r.case_name || <span className="muted">-</span>}</td>;
+      case "entry": return <td key={id}><div className="cellclip"><Linkify text={r.time_entry} /></div>{r.url ? <> <a href={r.url} target="_blank" rel="noreferrer" className="small noprint">link</a></> : null}</td>;
+      case "hrs": return <td key={id} className="num">{r.duration === null ? "" : Number(r.duration).toFixed(2)}</td>;
+      case "who": return <td key={id} className="who">{r.user_name}</td>;
+      case "type": return <td key={id}><Chip v={r.kind} colors={choices[CF.timeKind]} dash={false} /></td>;
+      case "firm": return <td key={id} className="small"><Chip v={r.firm} colors={choices[CF.timeFirm]} /></td>;
+      case "billed": return <td key={id} className="small">{r.billed ? "Yes" : <span className="muted">No</span>}</td>;
+      case "url": return <td key={id} className="small">{r.url
+        ? <a href={r.url} target="_blank" rel="noreferrer" className="filelink" title={r.url}>{labelFor(r.url)}</a>
+        : <span className="muted">-</span>}</td>;
+      case "content": return <td key={id} className="small"><div className="cellclip"><Linkify text={r.content} /></div></td>;
+      case "email": return <td key={id} className="small muted">{r.user_email}</td>;
+      case "source": return <td key={id} className="small muted">{r.source}</td>;
+      case "added": return <td key={id} className="date small muted">{r.added}</td>;
+      case "changed": return <td key={id} className="date small muted">{r.changed}</td>;
+      default: return <td key={id} />;
+    }
   }
 
   async function polish() {
@@ -195,8 +275,12 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   }
 
   async function remove(id: number) {
-    if (!confirm("Delete this time entry?")) return;
-    await fetch("/api/entries/" + id, { method: "DELETE" });
+    if (!confirm("Delete this time entry? It is removed from Airtable as well, and cannot be undone.")) return;
+    const r = await fetch("/api/entries/" + id, { method: "DELETE" });
+    const j = await r.json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setEditing(null);
+    setMsg({ kind: "ok", text: j.airtable ? "Deleted here and in Airtable." : "Deleted." });
     load();
   }
 
@@ -224,6 +308,74 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
   ];
   const groupDef = GROUPS.find((g) => g.id === groupId) || null;
   const groups = buildGroups(rows, groupDef);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLS_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved) && saved.length) setOrder(saved.filter((c: any) => COLUMNS.some((x) => x.id === c)));
+      }
+    } catch {}
+  }, []);
+  function persist(next: string[]) {
+    setOrder(next);
+    try { localStorage.setItem(COLS_KEY, JSON.stringify(next)); } catch {}
+  }
+  useEffect(() => {
+    if (!picker) return;
+    const away = (e: MouseEvent) => { if (pickerBox.current && !pickerBox.current.contains(e.target as Node)) setPicker(false); };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [picker]);
+  function dropCol(target: string) {
+    if (!dragId || dragId === target) return;
+    const next = order.filter((c) => c !== dragId);
+    next.splice(next.indexOf(target), 0, dragId);
+    persist(next);
+  }
+
+  const cols = order.map((id) => COLUMNS.find((c) => c.id === id)!).filter(Boolean);
+
+  const current = { from, to, fUser, fCase, fKind, fFirm, search, sort, dir, within, billed, minHrs, maxHrs, notQ, noHrs, caseEmpty, hasUrl };
+  const isBlank = !from && !to && !fUser && !fCase && !fKind && !fFirm && !search && !within && !billed && !minHrs && !maxHrs && !notQ && !noHrs && !caseEmpty && !hasUrl;
+  const sameAs = (p: any) => JSON.stringify({
+    from: p?.from ?? "", to: p?.to ?? "", fUser: p?.fUser ?? "", fCase: p?.fCase ?? "",
+    fKind: p?.fKind ?? "", fFirm: p?.fFirm ?? "", search: p?.search ?? "",
+    sort: p?.sort ?? "date", dir: p?.dir ?? "desc",
+    within: p?.within ?? "", billed: p?.billed ?? "", minHrs: p?.minHrs ?? "", maxHrs: p?.maxHrs ?? "",
+    notQ: p?.notQ ?? "", noHrs: p?.noHrs ?? false, caseEmpty: p?.caseEmpty ?? false, hasUrl: p?.hasUrl ?? "",
+  }) === JSON.stringify(current);
+
+  function applyView(p: any) {
+    setFrom(p?.from ?? ""); setTo(p?.to ?? "");
+    setFUser(p?.fUser ?? ""); setFCase(p?.fCase ?? "");
+    setFKind(p?.fKind ?? ""); setFFirm(p?.fFirm ?? "");
+    setSearch(p?.search ?? "");
+    setSort(p?.sort ?? "date"); setDir(p?.dir ?? "desc");
+    setWithin(p?.within ?? ""); setBilled(p?.billed ?? "");
+    setMinHrs(p?.minHrs ?? ""); setMaxHrs(p?.maxHrs ?? ""); setNotQ(p?.notQ ?? "");
+    setNoHrs(!!p?.noHrs); setCaseEmpty(!!p?.caseEmpty); setHasUrl(p?.hasUrl ?? "");
+    setPage(1);
+  }
+  async function saveView() {
+    const name = viewName.trim();
+    if (!name) return;
+    const j = await (await fetch("/api/views", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ page: "time", name, params: current }),
+    })).json();
+    if (j.error) { setMsg({ kind: "err", text: j.error }); return; }
+    setNaming(false); setViewName("");
+    setMsg({ kind: "ok", text: 'Saved the view "' + name + '".' });
+    loadViews();
+  }
+  async function deleteView(v: any) {
+    if (!confirm('Delete the saved view "' + v.name + '"?')) return;
+    await fetch("/api/views/" + v.id, { method: "DELETE" });
+    loadViews();
+  }
+
 
   return (
     <div className="wrap">
@@ -295,6 +447,46 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
               <div><label className="f">Case contains</label><input type="search" value={fCase} onChange={(e) => { setFCase(e.target.value); setPage(1); }} placeholder="e.g. Nichols" /></div>
               <div><label className="f">Entry text contains</label><input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="e.g. deposition" /></div>
             </div>
+
+            <div className="grid g4" style={{ marginTop: 7 }}>
+              <div><label className="f">Period</label>
+                <select value={within} onChange={(e) => { setWithin(e.target.value); setPage(1); }}>
+                  <option value="">Use the dates above</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="week">This week</option>
+                  <option value="month">This month</option>
+                  <option value="year">This year</option>
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                </select>
+              </div>
+              <div><label className="f">Billed</label>
+                <select value={billed} onChange={(e) => { setBilled(e.target.value); setPage(1); }}>
+                  <option value="">Either</option>
+                  <option value="true">Billed</option>
+                  <option value="false">Not billed</option>
+                </select>
+              </div>
+              <div><label className="f">Hours at least</label>
+                <input type="number" step="0.01" min="0" value={minHrs}
+                  onChange={(e) => { setMinHrs(e.target.value); setPage(1); }} placeholder="0.00" /></div>
+              <div><label className="f">Hours at most</label>
+                <input type="number" step="0.01" min="0" value={maxHrs}
+                  onChange={(e) => { setMaxHrs(e.target.value); setPage(1); }} placeholder="0.00" /></div>
+            </div>
+
+            <div className="row" style={{ marginTop: 7 }}>
+              <div style={{ flex: 1 }}><label className="f">Entry text does not contain</label>
+                <input type="search" value={notQ} onChange={(e) => { setNotQ(e.target.value); setPage(1); }}
+                  placeholder="e.g. no charge" /></div>
+              <div className="chips" style={{ marginTop: 0, alignSelf: "flex-end", paddingBottom: 2 }}>
+                <button className={"chip " + (noHrs ? "on" : "")} onClick={() => { setNoHrs(!noHrs); setPage(1); }}>No hours</button>
+                <button className={"chip " + (caseEmpty ? "on" : "")} onClick={() => { setCaseEmpty(!caseEmpty); setPage(1); }}>No case</button>
+                <button className={"chip " + (hasUrl === "1" ? "on" : "")} onClick={() => { setHasUrl(hasUrl === "1" ? "" : "1"); setPage(1); }}>Has a link</button>
+              </div>
+            </div>
           </>
         ) : null}
       </div>
@@ -313,34 +505,79 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
             </select>
             <a className="btn sm" href={"/api/entries/export?" + filterQS}>Excel / CSV</a>
             <RowSize />
+            <div className="ms" ref={pickerBox}>
+              <button className="btn sm" onClick={() => setPicker(!picker)}>Columns ({cols.length}/{COLUMNS.length})</button>
+              {picker ? (
+                <div className="mspanel" style={{ right: 0, left: "auto" }}>
+                  <div className="msrow">
+                    <button className="btn ghost sm" onClick={() => persist(COLUMNS.map((c) => c.id))}>Show all</button>
+                    <button className="btn ghost sm" onClick={() => { persist(DEFAULT_COLS); cw.reset(); }}>Reset</button>
+                    <div className="spacer" />
+                    <button className="btn ghost sm" onClick={() => setPicker(false)}>Done</button>
+                  </div>
+                  <div className="mslist">
+                    {COLUMNS.map((c) => (
+                      <label key={c.id} className="msitem">
+                        <input type="checkbox" checked={order.indexOf(c.id) >= 0}
+                          onChange={() => persist(order.indexOf(c.id) >= 0 ? order.filter((x) => x !== c.id) : [...order, c.id])} />
+                        <span>{c.label}</span>
+                        {order.indexOf(c.id) < 0 ? <span className="muted small" style={{ marginLeft: "auto" }}>hidden</span> : null}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <GroupPicker defs={GROUPS} value={groupId} onChange={(v) => { setGroupId(v); setFolded({}); }} />
             {cw.sized ? <button className="btn sm" onClick={cw.reset}>Reset widths</button> : null}
             <button className="btn sm" onClick={() => window.print()}>Print / PDF</button>
             <button className="btn sm" disabled={syncing} onClick={syncNow}>{syncing ? "Syncing..." : "Sync Airtable"}</button>
           </div>
         </div>
+        <div className="row noprint" style={{ marginBottom: 9 }}>
+          <div className="chips nowrap" style={{ marginTop: 0 }}>
+            <button className={"chip " + (isBlank ? "on" : "")} onClick={() => applyView({})}>Everything</button>
+            {views.map((v) => (
+              <span key={v.id} className="viewchip">
+                <button className={"chip " + (sameAs(v.params) ? "on" : "")} title={v.owner ? "Saved by " + v.owner : ""}
+                  onClick={() => applyView(v.params)}>{v.name}</button>
+                <button className="x" title={"Delete " + v.name} onClick={() => deleteView(v)}>&times;</button>
+              </span>
+            ))}
+            {views.length === 0 ? <span className="muted small">Set the filters, then save them here as a button.</span> : null}
+          </div>
+          <div className="spacer" />
+          {naming ? (
+            <div className="row">
+              <input type="text" autoFocus value={viewName} maxLength={40} placeholder="e.g. This month, RIE"
+                onChange={(e) => setViewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveView(); if (e.key === "Escape") { setNaming(false); setViewName(""); } }}
+                style={{ width: 180 }} />
+              <button className="btn primary sm" onClick={saveView}>Save</button>
+              <button className="btn ghost sm" onClick={() => { setNaming(false); setViewName(""); }}>Cancel</button>
+            </div>
+          ) : (
+            <button className="btn sm" onClick={() => setNaming(true)}>Save these filters</button>
+          )}
+        </div>
+
         <div className="tablewrap">
           <table className={"data" + (cw.sized ? " sized" : "")}>
             <thead><tr>
-              <Th id="date" label="Date" w={88} />
-              <Th id="case" label="Case" w={190} />
-              <Th id="entry" label="Entry" />
-              <Th id="hrs" label="Hrs" w={54} />
-              <Th id="who" label="Who" w={112} />
-              <Th id="type" label="Type" w={128} />
+              {cols.map((c) => <Th key={c.id} id={c.id} label={c.label} w={c.width} />)}
               <th className="noprint" style={{ width: 58 }}></th>
             </tr></thead>
             <tbody>
-              {loading ? (<tr><td colSpan={7} className="muted">Loading...</td></tr>)
-                : rows.length === 0 ? (<tr><td colSpan={7} className="muted">No entries match these filters.</td></tr>)
+              {loading ? (<tr><td colSpan={cols.length + 1} className="muted">Loading...</td></tr>)
+                : rows.length === 0 ? (<tr><td colSpan={cols.length + 1} className="muted">No entries match these filters.</td></tr>)
 : groups.map((g) => (
                 <Fragment key={"g" + g.key}>
                   {groupDef ? (
-                    <GroupRow label={g.key} count={g.items.length} span={7} extra={g.items.reduce((n: number, x: any) => n + Number(x.duration || 0), 0).toFixed(2) + " hrs"}
+                    <GroupRow label={g.key} count={g.items.length} span={cols.length + 1} extra={g.items.reduce((n: number, x: any) => n + Number(x.duration || 0), 0).toFixed(2) + " hrs"}
                       collapsed={!!folded[g.key]} onToggle={() => setFolded({ ...folded, [g.key]: !folded[g.key] })} />
                   ) : null}
                   {folded[g.key] ? null : g.items.map((r) => editing === r.id ? (
-                <tr key={r.id}><td colSpan={7}>
+                <tr key={r.id}><td colSpan={cols.length + 1}>
                   <div className="grid g4">
                     <div><label className="f">Date</label><input type="date" value={draft.entry_date || ""} onChange={(e) => setDraft({ ...draft, entry_date: e.target.value })} /></div>
                     <div style={{ gridColumn: "span 2" }}><label className="f">Case</label><CaseCombo value={draft.case_name || ""} onChange={(v) => setDraft({ ...draft, case_name: v })} /></div>
@@ -361,12 +598,7 @@ export default function Board({ me, aiOn }: { me: { name: string; email: string 
                 </td></tr>
               ) : (
                 <tr key={r.id}>
-                  <td className="date">{d10(r.entry_date)}</td>
-                  <td>{r.case_name || <span className="muted">-</span>}</td>
-                  <td><div className="cellclip">{r.time_entry}</div>{r.url ? <> <a href={r.url} target="_blank" rel="noreferrer" className="small noprint">link</a></> : null}</td>
-                  <td className="num">{r.duration === null ? "" : Number(r.duration).toFixed(2)}</td>
-                  <td className="who">{r.user_name}</td>
-                  <td><Chip v={r.kind} colors={choices[CF.timeKind]} dash={false} /></td>
+                  {cols.map((c) => cell(c.id, r))}
                   <td className="noprint"><button className="btn ghost sm" onClick={() => { setEditing(r.id); setDraft({ entry_date: d10(r.entry_date), case_name: r.case_name, time_entry: r.time_entry, duration: r.duration, kind: r.kind, firm: r.firm, user_name: r.user_name }); }}>Edit</button></td>
                 </tr>
                   ))}

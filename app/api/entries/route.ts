@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const { sql, params } = buildWhere(sp);
     const page = Math.max(1, parseInt(sp.get("page") || "1", 10));
     const pageSize = Math.min(2000, Math.max(1, parseInt(sp.get("pageSize") || "50", 10)));
-    const rows = await q(`select id, to_char(entry_date,'YYYY-MM-DD') as entry_date, case_name, time_entry, duration, user_name, user_email, firm, kind, url, content, billed, airtable_id from time_entries ${sql} ${orderBy(sp)} limit ${pageSize} offset ${(page - 1) * pageSize}`, params);
+    const rows = await q(`select id, to_char(entry_date,'YYYY-MM-DD') as entry_date, case_name, time_entry, duration, user_name, user_email, firm, kind, url, content, billed, airtable_id, source, email_from, email_to, to_char(created_at,'YYYY-MM-DD HH24:MI') as added, to_char(updated_at,'YYYY-MM-DD HH24:MI') as changed from time_entries ${sql} ${orderBy(sp)} limit ${pageSize} offset ${(page - 1) * pageSize}`, params);
     const agg = await q(`select count(*)::int as total, coalesce(sum(duration),0)::float as hours from time_entries ${sql}`, params);
     const users = await q(`select distinct user_name from time_entries where user_name is not null and user_name <> '' order by user_name limit 60`);
     return NextResponse.json({ rows, total: agg[0]?.total || 0, hours: agg[0]?.hours || 0, users: users.map((u: any) => u.user_name) });
