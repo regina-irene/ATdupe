@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 type Row = {
   id: number; case_name: string; party: string; title: string | null;
   source_file: string | null; note: string | null; updated_at: string; size: number;
+  share_token: string | null; active: boolean;
+};
+type Resp = {
+  id: number; case_name: string; party: string; person_name: string | null;
+  email: string | null; phone: string | null; submitted_text: string | null;
+  responses: string | null; received_at: string;
 };
 
 const when = (v: any) => {
@@ -25,6 +31,9 @@ export default function Questionnaires() {
   const [sideHtml, setSideHtml] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
+  const [resps, setResps] = useState<Resp[]>([]);
+  const [tab, setTab] = useState<"answers" | "form">("answers");
+  const [copied, setCopied] = useState("");
 
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,18 +42,22 @@ export default function Questionnaires() {
 
   const load = useCallback(async () => {
     try {
-      const j = await (await fetch("/api/questionnaires")).json();
+      const [j, k] = await Promise.all([
+        (await fetch("/api/questionnaires")).json(),
+        (await fetch("/api/questionnaires/responses")).json(),
+      ]);
       if (j.error) throw new Error(j.error);
       setRows(j.rows || []);
+      setResps(k.rows || []);
     } catch (e: any) { setMsg({ kind: "err", text: e.message }); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const cases = useMemo(() => {
     const t = q.trim().toLowerCase();
-    const names = [...new Set(rows.map((r) => r.case_name))];
+    const names = [...new Set([...rows.map((r) => r.case_name), ...resps.map((r) => r.case_name)])];
     return (t ? names.filter((n) => n.toLowerCase().indexOf(t) >= 0) : names).sort((a, b) => a.localeCompare(b));
-  }, [rows, q]);
+  }, [rows, resps, q]);
 
   useEffect(() => { if (!caseName && cases.length) setCaseName(cases[0]); }, [cases, caseName]);
 
@@ -56,6 +69,20 @@ export default function Questionnaires() {
     [parties, party]);
 
   const current = parties.find((p) => p.party === party);
+  const caseResps = useMemo(
+    () => resps.filter((r) => r.case_name.toLowerCase() === caseName.toLowerCase()),
+    [resps, caseName]);
+  const respParties = useMemo(
+    () => [...new Set(caseResps.map((r) => r.party))].sort(), [caseResps]);
+  const link = (t: string | null) =>
+    t ? (typeof window === "undefined" ? "" : window.location.origin) + "/q/" + t : "";
+
+  function copy(text: string, what: string) {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(what);
+      setTimeout(() => setCopied(""), 1800);
+    }).catch(() => setMsg({ kind: "err", text: "Could not copy. Select the link and copy it by hand." }));
+  }
 
   // Fetched only when actually shown; these documents can be large.
   const fetchDoc = useCallback(async (id: number) => {
@@ -202,28 +229,93 @@ export default function Questionnaires() {
             ))}
           </div>
 
-          <div className="row" style={{ marginBottom: 9 }}>
-            {/* a tab per parent */}
-            <div className="chips" style={{ marginTop: 0 }}>
-              {parties.map((p) => (
-                <button key={p.id} className={"chip pchip " + partyClass(p.party) + (party === p.party && !compare ? " on" : "")}
-                  onClick={() => { setParty(p.party); setCompare(false); }}>{p.party}</button>
-              ))}
-              {parties.length > 1 ? (
-                <button className={"chip " + (compare ? "on" : "")} onClick={() => setCompare(!compare)}>Side by side</button>
-              ) : null}
-            </div>
-            <div className="spacer" />
-            {current && !compare ? (
-              <div className="row noprint">
-                <span className="muted small">Updated {when(current.updated_at)}</span>
-                <button className="btn sm" onClick={() => openInTab(html, current.party)}>Open in a tab</button>
-                <button className="btn ghost sm" onClick={() => remove(current)}>Remove</button>
+          {/* the links to send the parents */}
+          <div className="linkrow noprint">
+            {parties.map((p) => (
+              <div className="linkbox" key={p.id}>
+                <div>
+                  <b>{p.party === "Both" ? "Questionnaire link" : p.party + "'s link"}</b>
+                  <div className="muted small">{p.title || p.source_file}</div>
+                </div>
+                <div className="spacer" />
+                {p.share_token ? (
+                  <>
+                    <code className="linkcode" title={link(p.share_token)}>{link(p.share_token)}</code>
+                    <button className="btn sm" onClick={() => copy(link(p.share_token), "link" + p.id)}>
+                      {copied === "link" + p.id ? "Copied" : "Copy link"}
+                    </button>
+                    <a className="btn ghost sm" href={link(p.share_token)} target="_blank" rel="noreferrer">Open</a>
+                  </>
+                ) : <span className="muted small">Save it again to get a link.</span>}
+                <button className="btn ghost sm" onClick={() => remove(p)}>Remove</button>
               </div>
+            ))}
+          </div>
+
+          <div className="row" style={{ margin: "10px 0 9px" }}>
+            <div className="seg">
+              <button className={tab === "answers" ? "on" : ""} onClick={() => setTab("answers")}>
+                Answers {caseResps.length ? "(" + caseResps.length + ")" : ""}
+              </button>
+              <button className={tab === "form" ? "on" : ""} onClick={() => setTab("form")}>The form</button>
+            </div>
+            {tab === "form" ? (
+              <div className="chips" style={{ marginTop: 0 }}>
+                {parties.map((p) => (
+                  <button key={p.id} className={"chip pchip " + partyClass(p.party) + (party === p.party && !compare ? " on" : "")}
+                    onClick={() => { setParty(p.party); setCompare(false); }}>{p.party}</button>
+                ))}
+                {parties.length > 1 ? (
+                  <button className={"chip " + (compare ? "on" : "")} onClick={() => setCompare(!compare)}>Side by side</button>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="spacer" />
+            {tab === "form" && current && !compare ? (
+              <button className="btn sm noprint" onClick={() => openInTab(html, current.party)}>Open in a tab</button>
             ) : null}
           </div>
 
-          {loadingDoc ? <p className="muted small">Loading...</p> : compare ? (
+          {tab === "answers" ? (
+            caseResps.length === 0 ? (
+              <p className="muted small">
+                Nothing submitted yet. Send the link above and answers will appear here as they come in.
+              </p>
+            ) : (
+              <div className={respParties.length > 1 ? "qncompare" : ""}>
+                {respParties.map((pt) => {
+                  const latest = caseResps.filter((r) => r.party === pt)[0];
+                  return (
+                    <div className="qnpane" data-party={partyClass(pt)} key={pt}>
+                      <div className="partyhead">
+                        {pt}
+                        <span className="muted small" style={{ float: "right", textTransform: "none", letterSpacing: 0 }}>
+                          {latest.submitted_text || when(latest.received_at)}
+                        </span>
+                      </div>
+                      <div className="answers">
+                        <div className="muted small" style={{ marginBottom: 7 }}>
+                          {[latest.person_name, latest.email, latest.phone].filter(Boolean).join(" · ")}
+                        </div>
+                        <pre>{latest.responses}</pre>
+                        <div className="row noprint" style={{ marginTop: 8 }}>
+                          <button className="btn ghost sm"
+                            onClick={() => copy(latest.responses || "", "ans" + latest.id)}>
+                            {copied === "ans" + latest.id ? "Copied" : "Copy answers"}
+                          </button>
+                          {caseResps.filter((r) => r.party === pt).length > 1 ? (
+                            <span className="muted small">
+                              {caseResps.filter((r) => r.party === pt).length} submissions, showing the most recent
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : loadingDoc ? <p className="muted small">Loading...</p> : compare ? (
             <div className="qncompare">
               {parties.map((p) => (
                 <div key={p.id} className="qnpane" data-party={partyClass(p.party)}>

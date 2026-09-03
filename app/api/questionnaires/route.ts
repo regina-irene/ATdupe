@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     }
     const rows = await q(
       `select id, case_name, party, title, source_file, note, uploaded_by, created_at, updated_at,
-              length(html) as size
+              share_token, active, length(html) as size
          from questionnaires order by lower(case_name), lower(party)`);
     return NextResponse.json({ rows });
   } catch (e: any) {
@@ -38,14 +38,16 @@ export async function POST(req: Request) {
     const party = String(b.party || "").trim();
     if (!caseName || !party) return NextResponse.json({ error: "A case and a party are needed." }, { status: 400 });
     if (!b.html) return NextResponse.json({ error: "No questionnaire content." }, { status: 400 });
+    const token = (globalThis.crypto?.randomUUID?.() || String(Math.random())).replace(/-/g, "").slice(0, 22);
     await q(
-      `insert into questionnaires (case_name, party, title, html, source_file, note, uploaded_by)
-       values ($1,$2,$3,$4,$5,$6,$7)
+      `insert into questionnaires (case_name, party, title, html, source_file, note, uploaded_by, share_token)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)
        on conflict (lower(case_name), lower(party)) do update set
          title = excluded.title, html = excluded.html, source_file = excluded.source_file,
          note = coalesce(excluded.note, questionnaires.note),
-         uploaded_by = excluded.uploaded_by, updated_at = now()`,
-      [caseName, party, b.title || null, b.html, b.source_file || null, b.note || null, s.email || null]);
+         uploaded_by = excluded.uploaded_by, updated_at = now(),
+         share_token = coalesce(questionnaires.share_token, excluded.share_token)`,
+      [caseName, party, b.title || null, b.html, b.source_file || null, b.note || null, s.email || null, token]);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
