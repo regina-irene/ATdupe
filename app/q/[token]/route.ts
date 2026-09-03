@@ -13,9 +13,9 @@ Edwards Family Law at <a href="mailto:regina@edwardsfamilylaw.com">regina@edward
 
 // Mirrors whatever the form submits to its own handler into Chambers as well,
 // so nothing has to change inside the uploaded file.
-const CAPTURE = (caseName: string, token: string) => `
+const CAPTURE = (token: string) => `
 <script>(function(){
-  var CASE = ${JSON.stringify(caseName)}, TOKEN = ${JSON.stringify(token)};
+  var TOKEN = ${JSON.stringify(token)};
   var real = window.fetch;
   window.fetch = function(input, init){
     try{
@@ -26,7 +26,6 @@ const CAPTURE = (caseName: string, token: string) => `
           try{
             var body = typeof copy === "string" ? JSON.parse(copy) : null;
             if(!body) return;
-            body.case_name = body.case_name || CASE;
             body.token = TOKEN;
             real("/api/questionnaires/submit", {
               method: "POST",
@@ -51,7 +50,7 @@ export async function GET(_req: Request, ctx: any) {
       return new Response(NOT_FOUND, { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
 
     const html = String(rows[0].html || "");
-    const script = CAPTURE(rows[0].case_name, String(p.token));
+    const script = CAPTURE(String(p.token));
     const out = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, script + "</body>") : html + script;
 
     return new Response(out, {
